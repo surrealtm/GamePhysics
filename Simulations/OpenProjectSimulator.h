@@ -49,15 +49,17 @@ struct Masspoint {
 //
 
 struct Heat_Grid {
-	int rows, columns;
-	float *values = NULL; // Array of size 'rows * columns'. @@Leak: Does not get freed at program step, but eh.
+	int width, height;
+	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
 
-	void create(int rows, int columns);
+	void create(int width, int height);
 	void destroy();
 	void reset();
 	void apply_boundary_condition();
+	void randomize();
 	void set(int x, int y, float value);
 	float get(int x, int y);
+	void debug_print();
 };
 
 //
@@ -137,4 +139,5 @@ private:
 	// Heat Diffusion.
 	//
 	Heat_Grid heat_grid;
+	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
 };
