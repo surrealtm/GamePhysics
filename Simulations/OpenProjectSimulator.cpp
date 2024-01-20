@@ -4,6 +4,8 @@
 // Utility Functions
 //
 
+double win32_performance_frequency;
+
 Vec3 lerp(Vec3 from, Vec3 to, float t) {
 	return Vec3(from.x * (1 - t) + to.x * t,
 				from.y * (1 - t) + to.y * t,
@@ -26,12 +28,25 @@ int random_int(int min, int max) {
 	return normalized + min;
 }
 
+void setup_timing() {
+	LARGE_INTEGER frequency;
+	QueryPerformanceFrequency(&frequency);
+	win32_performance_frequency = (double) frequency.QuadPart;
+}
+
+double get_current_time_in_milliseconds() {
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return (double) counter.QuadPart / win32_performance_frequency;
+}
+
 //
 // Simulator
 //
 
 OpenProjectSimulator::OpenProjectSimulator() {
 	this->reset();
+	setup_timing();
 }
 
 const char * OpenProjectSimulator::getTestCasesStr() {
@@ -91,7 +106,78 @@ void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
 
 void OpenProjectSimulator::notifyCaseChanged(int testCase) {} // We don't have different test cases, so just ignore this.
 
-void OpenProjectSimulator::simulateTimestep(float dt) {
+void OpenProjectSimulator::simulateTimestep(float timestep) {
+	//
+	// :TimeStep
+	//
+#if USE_FIXED_DT
+	double now = get_current_time_in_milliseconds();
+
+	while(now - this->time_of_previous_update > FIXED_DT) {
+		this->update_game(FIXED_DT);
+		this->time_of_previous_update += FIXED_DT;
+	}
+#else
+	this->update_game(timestep);
+#endif
+
+	//Sleep(random_int(5, 100));
+}
+
+void OpenProjectSimulator::externalForcesCalculations(float timeStep) {
+	// @Incomplete
+}
+
+void OpenProjectSimulator::onClick(int x, int y) {}
+
+void OpenProjectSimulator::onMouse(int x, int y) {}
+
+
+int OpenProjectSimulator::create_masspoint(Vec3 position, float mass) {
+	assert(this->masspoint_count < MAX_MASSPOINTS);
+	int index = this->masspoint_count;
+	
+	Masspoint & m  = this->masspoints[index];
+	m.position     = position;
+	m.velocity     = Vec3(0, 0, 0);
+	m.inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
+
+	++this->masspoint_count;
+	return index;
+}
+
+int OpenProjectSimulator::create_spring(int a, int b, float initial_length, float stiffness) {
+	assert(this->spring_count < MAX_SPRINGS);
+	int index = this->spring_count;
+
+	Spring & s = this->springs[index];
+	s.a = a;
+	s.b = b;
+	s.stiffness = stiffness;
+	s.initial_length = initial_length;
+	s.current_length = 0;
+	s.current_force_from_a_to_b = Vec3(0, 0, 0);
+
+	++this->spring_count;
+	return index;
+}
+
+void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 force) {
+	assert(index >= 0 && index < this->masspoint_count);
+	this->masspoints[index].velocity += force;
+}
+
+void OpenProjectSimulator::setup_game() {
+	int a = this->create_masspoint(Vec3(0, 0, 0), 10);
+	int b = this->create_masspoint(Vec3(0, 2, 0), 10);
+	this->apply_impulse_to_masspoint(a, Vec3(-1, 0, 0));
+	this->apply_impulse_to_masspoint(b, Vec3( 1, 0, 0));
+	this->create_spring(a, b, 1.f, 40.f);
+
+	this->time_of_previous_update = get_current_time_in_milliseconds();
+}
+
+void OpenProjectSimulator::update_game(float dt) {
 	// @Incomplete
 
 	//
@@ -189,51 +275,7 @@ void OpenProjectSimulator::simulateTimestep(float dt) {
 		}
 	}
 
-	//this->debug_print();
-}
-
-void OpenProjectSimulator::externalForcesCalculations(float timeStep) {
-	// @Incomplete
-}
-
-void OpenProjectSimulator::onClick(int x, int y) {}
-
-void OpenProjectSimulator::onMouse(int x, int y) {}
-
-
-int OpenProjectSimulator::create_masspoint(Vec3 position, float mass) {
-	assert(this->masspoint_count < MAX_MASSPOINTS);
-	int index = this->masspoint_count;
-	
-	Masspoint & m  = this->masspoints[index];
-	m.position     = position;
-	m.velocity     = Vec3(0, 0, 0);
-	m.inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
-
-	++this->masspoint_count;
-	return index;
-}
-
-int OpenProjectSimulator::create_spring(int a, int b, float initial_length, float stiffness) {
-	assert(this->spring_count < MAX_SPRINGS);
-	int index = this->spring_count;
-
-	Spring & s = this->springs[index];
-	s.a = a;
-	s.b = b;
-	s.stiffness = stiffness;
-	s.initial_length = initial_length;
-	s.current_length = 0;
-	s.current_force_from_a_to_b = Vec3(0, 0, 0);
-
-	++this->spring_count;
-	return index;
-}
-
-void OpenProjectSimulator::setup_game() {
-	int a = this->create_masspoint(Vec3(0, 0, 0), 2);
-	int b = this->create_masspoint(Vec3(1, 1, 0), 2);
-	this->create_spring(a, b, 0.5f, 40.f);
+	//ithis->debug_print();
 }
 
 void OpenProjectSimulator::debug_print() {

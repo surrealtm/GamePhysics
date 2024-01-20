@@ -2,6 +2,10 @@
 
 #include "Simulator.h"
 
+#define SIMULATOR_UPDATES_PER_SECOND 100
+#define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
+#define USE_FIXED_DT true // :TimeStep
+
 #define MAX_MASSPOINTS 32
 #define MAX_SPRINGS    16
 
@@ -18,6 +22,8 @@ Vec3 lerp(Vec3 from, Vec3 to, float t);
 float clamp_float(float value, float min, float max);
 float random_float(float min, float max);
 int random_int(int min, int max);
+
+double get_current_time_in_milliseconds();
 
 //
 // Mass Spring System
@@ -83,10 +89,26 @@ public:
 	int create_masspoint(Vec3 position, float mass);
 	int create_spring(int a, int b, float initial_length, float stiffness);
 
+	void apply_impulse_to_masspoint(int index, Vec3 force);
+
 	void setup_game();
+	void update_game(float dt);
 	void debug_print();
 
 private:
+	//
+	// :TimeStep
+	// Since this is supposed to be a game, we definitely want the simulation to run
+	// frame-rate-independent. Everything else is just really dumb, since a faster computer
+	// might change the game's difficulty. Also, the simulation sometimes runs slower after
+	// startup and then has a sudden burst of speed (maybe some D3D11 stuff?), which is just
+	// very anti-awesome.
+	// Therefore, this provides it's own timing to ensure that we run a specific amount of
+	// updates per second, with the appropriate delta for these updates.
+	//
+	double time_of_previous_update;
+
+
 	//
 	// General stuff.
 	//
