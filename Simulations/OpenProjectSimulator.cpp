@@ -1,5 +1,6 @@
 #include "OpenProjectSimulator.h"
 #include "pcgsolver.h"
+#include "sat.h"
 
 //
 // Utility Functions
@@ -262,7 +263,6 @@ float Heat_Grid::get(int x, int y) {
 //
 
 OpenProjectSimulator::OpenProjectSimulator() {
-    this->reset();
     setup_timing();
 }
 
@@ -289,6 +289,8 @@ void OpenProjectSimulator::reset() {
     this->heat_alpha = 0.5f; // Half decay.
 
     this->setup_game();
+    
+    __sat_tests(); // @Cleanup: Remove this once the SAT works.
 }
 
 void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
