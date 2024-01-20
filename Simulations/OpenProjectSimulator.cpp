@@ -40,6 +40,60 @@ double get_current_time_in_milliseconds() {
 	return (double) counter.QuadPart / win32_performance_frequency;
 }
 
+
+//
+// Heat Diffusion
+//
+
+void Heat_Grid::create(int rows, int columns) {
+	this->destroy();
+
+	this->rows = rows;
+	this->columns = columns;
+	this->values = (float *) malloc(this->rows * this->columns * sizeof(float));
+	assert(this->values != NULL);
+	this->reset();
+}
+
+void Heat_Grid::destroy() {
+	if(this->values) free(this->values);
+	this->values  = NULL;
+	this->rows    = 0;
+	this->columns = 0;
+}
+
+void Heat_Grid::reset() {
+	memset(this->values, 0, this->rows * this->columns * sizeof(float));
+	this->apply_boundary_condition();
+}
+
+void Heat_Grid::apply_boundary_condition() {
+	const float boundary_value = 1.f;
+	
+	for(int x = 0; x < this->columns; ++x) {
+		this->set(x, 0, boundary_value);
+		this->set(x, this->rows - 1, boundary_value);
+	}
+
+	for(int y = 1; y < this->rows - 1; ++y) {
+		this->set(0, y, boundary_value);
+		this->set(this->columns - 1, y, boundary_value);
+	}
+}
+
+void Heat_Grid::set(int x, int y, float value) {
+	assert(x >= 0 && x < this->columns);
+	assert(y >= 0 && y < this->rows);
+	this->values[y * this->columns + x] = value;
+}
+
+float Heat_Grid::get(int x, int y) {
+	assert(x >= 0 && x < this->columns);
+	assert(y >= 0 && y < this->rows);
+	return this->values[y * this->columns + x];
+}
+
+
 //
 // Simulator
 //
@@ -55,7 +109,7 @@ const char * OpenProjectSimulator::getTestCasesStr() {
 
 void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
 	// @Incomplete: Maybe add a timestep, gravity UI.
-	this->duc = DUC;
+	this->DUC = DUC;
 }
 
 void OpenProjectSimulator::reset() {
@@ -77,6 +131,8 @@ void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
 	// Draw all masspoints and springs if requested.
 	//
 	if(this->draw_requests & DRAW_SPRINGS) {
+		const float sphere_radius = 0.1f;
+
 		for(int i = 0; i < this->masspoint_count; ++i) {
 			Masspoint & masspoint = this->masspoints[i];
 
@@ -84,11 +140,11 @@ void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
 			float g = ((i + this->masspoint_count / 2) % this->masspoint_count) / (float) this->masspoint_count;
 			float b = ((this->masspoint_count + 1 - i) % this->masspoint_count) / (float) this->masspoint_count;
         
-			this->duc->setUpLighting(Vec3(0, 0, 0), Vec3(r, g, b), 1, Vec3(r, g, b));
-			this->duc->drawSphere(masspoint.position, Vec3(DRAW_SPHERE_RADII, DRAW_SPHERE_RADII, DRAW_SPHERE_RADII));
+			this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(r, g, b), 1, Vec3(r, g, b));
+			this->DUC->drawSphere(masspoint.position, Vec3(sphere_radius, sphere_radius, sphere_radius));
 		}
 
-		this->duc->beginLine();
+		this->DUC->beginLine();
 
 		for(int i = 0; i < this->spring_count; ++i) {
 			Spring & spring = this->springs[i];
@@ -97,10 +153,43 @@ void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
 
 			Vec3 color = lerp(Vec3(0, 1, 0), Vec3(1, 0, 00), clamp_float(tension / 3, 0, 1));
 
-			this->duc->drawLine(this->masspoints[spring.a].position, color, this->masspoints[spring.b].position, color);
+			this->DUC->drawLine(this->masspoints[spring.a].position, color, this->masspoints[spring.b].position, color);
 		}
 
-		this->duc->endLine();
+		this->DUC->endLine();
+	}
+
+	//
+	// Draw the heat grid if requested.
+	//
+	if(this->draw_requests & DRAW_HEAT_MAP) {
+		const float visual_sphere_radius = .1f;
+		const float visual_grid_width = 1, visual_grid_height = 1;
+		const float visual_grid_offset_x = -visual_grid_width / 2 + visual_sphere_radius / 2, visual_grid_offset_y = -visual_grid_height / 2 + visual_sphere_radius / 2;
+		
+		Vec3 medium_color = Vec3(0, 0, 0);
+		Vec3 cold_color   = Vec3(.8, .2, .2);
+		Vec3 hot_color    = Vec3(1, 1, 1);
+    
+		for(int y = 0; y < this->heat_grid.rows; ++y) {
+			for(int x = 0; x < this->heat_grid.columns; ++x) {
+				float visual_x = (x / (float) this->heat_grid.columns) * visual_grid_width  + visual_grid_offset_x;
+				float visual_y = (y / (float) this->heat_grid.rows)    * visual_grid_height + visual_grid_offset_y;
+				float value = this->heat_grid.get(x, y);
+            
+				Vec3 position = Vec3(visual_x, visual_y, 0);
+				Vec3 scale    = Vec3(visual_sphere_radius, visual_sphere_radius, visual_sphere_radius);
+
+				Vec3 color;
+				if(value >= 0.0)
+					color = lerp(medium_color, hot_color, value);
+				else
+					color = lerp(medium_color, cold_color, -value);
+
+				this->DUC->setUpLighting(Vec3(0, 0, 0), color, 5, color);
+				this->DUC->drawSphere(position, scale);
+			}
+		}
 	}
 }
 
@@ -120,8 +209,6 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
 #else
 	this->update_game(timestep);
 #endif
-
-	//Sleep(random_int(5, 100));
 }
 
 void OpenProjectSimulator::externalForcesCalculations(float timeStep) {
@@ -168,12 +255,23 @@ void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 force) {
 }
 
 void OpenProjectSimulator::setup_game() {
+	//
+	// Set up the springs.
+	//
 	int a = this->create_masspoint(Vec3(0, 0, 0), 10);
 	int b = this->create_masspoint(Vec3(0, 2, 0), 10);
 	this->apply_impulse_to_masspoint(a, Vec3(-1, 0, 0));
 	this->apply_impulse_to_masspoint(b, Vec3( 1, 0, 0));
 	this->create_spring(a, b, 1.f, 40.f);
 
+	//
+	// Set up the heat grid.
+	//
+	this->heat_grid.create(10, 10);
+
+	//
+	// Set up the timing info.
+	//
 	this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 

@@ -9,8 +9,6 @@
 #define MAX_MASSPOINTS 32
 #define MAX_SPRINGS    16
 
-#define DRAW_SPHERE_RADII 0.1f // For drawing masspoints
-
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
 
@@ -49,6 +47,18 @@ struct Masspoint {
 //
 // Heat Diffusion
 //
+
+struct Heat_Grid {
+	int rows, columns;
+	float *values = NULL; // Array of size 'rows * columns'. @@Leak: Does not get freed at program step, but eh.
+
+	void create(int rows, int columns);
+	void destroy();
+	void reset();
+	void apply_boundary_condition();
+	void set(int x, int y, float value);
+	float get(int x, int y);
+};
 
 //
 // Simulator
@@ -108,11 +118,9 @@ private:
 	//
 	double time_of_previous_update;
 
-
 	//
 	// General stuff.
 	//
-	DrawingUtilitiesClass * duc;
 	DrawRequest draw_requests;
 	float gravity;
 
@@ -124,4 +132,9 @@ private:
 	int masspoint_count;
 	int spring_count;
 	float spring_damping; // 0 means no damping, 1 means complete damping
+
+	//
+	// Heat Diffusion.
+	//
+	Heat_Grid heat_grid;
 };
