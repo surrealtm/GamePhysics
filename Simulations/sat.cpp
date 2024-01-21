@@ -31,11 +31,21 @@ SAT_Scalar sat_dot(SAT_Vec3 lhs, SAT_Vec3 rhs) {
     return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
 }
 
-SAT_Vec3 sat_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
+SAT_Vec3 sat_normalized_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
     SAT_Vec3 result;
     result.x = lhs.y * rhs.z - lhs.z - rhs.y;
     result.y = lhs.z * rhs.x - lhs.x * rhs.z;
     result.z = lhs.x * rhs.y - lhs.y * rhs.x;
+
+
+    SAT_Scalar magnitude = sqrt(result.x * result.x + result.y * result.y + result.z * result.z);
+
+    if(magnitude >= 0.0001f) {
+        result.x /= magnitude;
+        result.y /= magnitude;
+        result.z /= magnitude;
+    }
+    
     return result;
 }
 
@@ -93,6 +103,8 @@ SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
 
 /* =============================== Internal Logic =============================== */
 
+// The collision normal is always supposed to be the face normal of LHS. If we are checking a normal
+// of RHS, then we need to flip that normal around for the result.
 bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     if(sat_dot(axis, axis) <= 0.00001) return false; // The axis was spawned from a cross product, but the two vectors were parallel, so no valid axis was created.
 
@@ -214,6 +226,8 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     
     //
     // Check each axis to find a possible separating axis.
+    // @@Speed: We could stop checking as soon as we found one separating axis, since a collision cannot
+    // occur at that point.
     //
     for(int i = 0; i < SAT_AXIS_COUNT; ++i) {
         // Check each of the boxes axis.
@@ -221,17 +235,17 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         state.found_separating_axis |= __sat_is_separating_axis(&state, state.unit_axis[SAT_B][i]);
 
         // Check some edge-to-edge axis.
-        state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][i], state.unit_axis[SAT_B][i]));
+        state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][i], state.unit_axis[SAT_B][i]));
     }
         
     // Check the remaining edge-to-edge axis.
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Y]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Z]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_Z]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Y]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Z]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_Z]));
 
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_Y]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_X]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_X]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_Y]));
     
     //
     // If we have not found a separating axis, it means that there is a collision.

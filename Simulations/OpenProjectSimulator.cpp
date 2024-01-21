@@ -161,7 +161,7 @@ void Rigid_Body::create(Vec3 size, Real mass) {
 
 void Rigid_Body::warp(Vec3 center, Quat orientation) {
     this->center_of_mass = center;
-	this->orientation    = orientation;
+	this->orientation    = orientation.unit();
 
 	this->force            = Vec3(0, 0, 0);
 	this->torque           = Vec3(0, 0, 0);
@@ -192,8 +192,12 @@ void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
 void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
-	this->linear_velocity  += impulse * this->inverse_mass;
+	this->impulse          += impulse;
 	this->angular_momentum += cross(position_relative_to_center, impulse);
+}
+
+void Rigid_Body::apply_torque(Vec3 torque) {
+	this->torque += torque;
 }
 
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
@@ -286,7 +290,7 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
 void OpenProjectSimulator::reset() {
     // @Incomplete.
     this->draw_requests = DRAW_EVERYTHING;
-    this->gravity = 0.0f; // No gravity for now.
+    this->gravity = -10.0f;
 
     this->masspoint_count = 0;
     this->spring_count    = 0;
@@ -384,6 +388,11 @@ void OpenProjectSimulator::apply_impulse_to_rigid_body(int index, Vec3 world_spa
     this->rigid_bodies[index].apply_impulse(world_space_position, impulse);
 }
 
+void OpenProjectSimulator::apply_torque_to_rigid_body(int index, Vec3 torque) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    this->rigid_bodies[index].apply_torque(torque);
+}
+
 void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orientation) {
     assert(index >= 0 && index < this->rigid_body_count);
     this->rigid_bodies[index].warp(position, orientation);
@@ -405,10 +414,11 @@ void OpenProjectSimulator::setup_game() {
     // Set up a rigid body.
     //
     if(true) {
-        int a = this->create_rigid_body(Vec3(2, 1, 0.5), 10);
-        int b = this->create_rigid_body(Vec3(10, 1, 10), 0);
+        int a = this->create_rigid_body(Vec3(1, 1, 1), 1);
+        int b = this->create_rigid_body(Vec3(4, 1, 4), 0);
         this->warp_rigid_body(a, Vec3(0, 5, 0), Quat(0, 0, 0, 1));
-        this->apply_impulse_to_rigid_body(a, Vec3(0, 5, 0), Vec3(0, -1, 0));
+        //        this->warp_rigid_body(a, Vec3(0, 1, 0), Quat(0, 0, 1, 0)); // @Cleanup: This rotation currently breaks collision resolution...
+        //        this->apply_torque_to_rigid_body(a, Vec3(1, 0, 0)); // @Cleanup: This rotation is also pretty funny, but probably not right...
     }
     
     //
@@ -427,9 +437,9 @@ void OpenProjectSimulator::setup_game() {
 
 void OpenProjectSimulator::update_game(float dt) {
     // @Incomplete
-
     //
     // Update the mass-spring-system using the Midpoint method.
+    // @Incomplete: Add external forces to each masspoint.
     //
     {
         Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
@@ -487,7 +497,7 @@ void OpenProjectSimulator::update_game(float dt) {
         //
 
         for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
+            Masspoint & masspoint = this->masspoints[i];
             masspoint.position += dt * temp_velocities[i];
             masspoint.velocity += Vec3(0, -dt * this->gravity, 0);
         }
@@ -640,8 +650,18 @@ void OpenProjectSimulator::update_game(float dt) {
     //
     {
         //
+        // Add velocity and external forces to all rigid bodies.
+        //
+        for(int i = 0; i < this->rigid_body_count; ++i) {
+            Rigid_Body & body = this->rigid_bodies[i];
+    	    if(body.inverse_mass == 0) continue;
+            
+            // @Incomplete: Add external forces.
+            body.linear_velocity.y += dt * this->gravity; // Add gravity
+        }
+
+        //
         // Resolve collisions between the rigid bodies.
-        // @Incomplete.
         //
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & lhs = this->rigid_bodies[i];
@@ -649,14 +669,61 @@ void OpenProjectSimulator::update_game(float dt) {
 
             for(int j = i + 1; j < this->rigid_body_count; ++j) {
                 Rigid_Body & rhs = this->rigid_bodies[j];
-                SAT_Input sat_rhs = sat_input(rhs.center_of_mass, rhs.orientation, rhs.size);
-                
                 if(lhs.inverse_mass == 0 && rhs.inverse_mass == 0) continue; // Don't do collisions between two static objects.
 
+                //
+                // Check for a collision between the two bodies.
+                //
+                SAT_Input sat_rhs = sat_input(rhs.center_of_mass, rhs.orientation, rhs.size);
                 SAT_Result result = sat(sat_lhs, sat_rhs);
                 if(!result.found_collision) continue;
                 
-                lhs.apply_impulse(lhs.center_of_mass, Vec3(0, 1, 0));
+                Real point_factor = 1.0 / (Real) result.world_space_position_count;
+                Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
+                
+                printf("Found a collision: Normal = " PRINT_FIXED_VEC3 ", Depth = " PRINT_FIXED_FLOAT "\n", contact_normal.x, contact_normal.y, contact_normal.z, result.depth);
+
+                //
+                // Handle each contact point.
+                //
+                for(int k = 0; k < result.world_space_position_count; ++k) {
+                    Vec3 contact_point = Vec3(result.world_space_positions[k].x, result.world_space_positions[k].y, result.world_space_positions[k].z);
+                    Vec3 contact_point_velocity_lhs = lhs.get_world_space_velocity_at(contact_point);
+                    Vec3 contact_point_velocity_rhs = rhs.get_world_space_velocity_at(contact_point);
+
+                    Vec3 relative_velocity = contact_point_velocity_lhs - contact_point_velocity_rhs;
+                    Real rv_dot_normal = dot(relative_velocity, contact_normal);
+                    if(rv_dot_normal > 0.0) continue; // Bodies are already separating, nothing to do.
+
+                    //
+                    // Do a proper collision response, by calculating the impulse between the two bodies,
+                    // and applying the respective part to each of them.
+                    //
+                    const Real restitution = 0.5;
+
+                    Vec3 collision_point_on_lhs = contact_point - lhs.center_of_mass; // xa
+                    Vec3 collision_point_on_rhs = contact_point - rhs.center_of_mass; // xb
+
+                    Vec3 collision_point_on_lhs_cross_normal = cross(contact_normal, collision_point_on_lhs);
+                    Vec3 collision_point_on_rhs_cross_normal = cross(contact_normal, collision_point_on_rhs);
+
+                    Vec3 applied_inerta_on_lhs = cross(mat3_mul_vec3(lhs.inverse_inertia, collision_point_on_lhs_cross_normal), collision_point_on_lhs_cross_normal);
+                    Vec3 applied_inerta_on_rhs = cross(mat3_mul_vec3(rhs.inverse_inertia, collision_point_on_rhs_cross_normal), collision_point_on_rhs_cross_normal);
+
+                    Real impulse_magnitude_nominator   = -(1 + restitution) * rv_dot_normal;
+                    Real impulse_magnitude_denominator = lhs.inverse_mass + rhs.inverse_mass + dot(applied_inerta_on_lhs + applied_inerta_on_rhs, contact_normal);
+
+                    Real impulse_magnitude = impulse_magnitude_nominator / impulse_magnitude_denominator; // AKA Big 'J'.
+                    
+                    Vec3 impulse = contact_normal * impulse_magnitude * point_factor;
+
+                    //
+                    // Apply the impulse to both bodies.
+                    //
+
+                    lhs.apply_impulse(contact_point,  impulse);
+                    rhs.apply_impulse(contact_point, -impulse);
+                }
             }
         }
 
@@ -672,8 +739,10 @@ void OpenProjectSimulator::update_game(float dt) {
             //
             // Integrate the linear part using Euler.
             //
+            body.linear_velocity += body.impulse * body.inverse_mass; // Impulse needs to have a direct impact on the linear velocity without integration. It is only a seperate variable since we are resolving multiple contact points at once, in which case modifying the linear velocity in the resolution loop would manipulate how these contact points are resolved, which we don't want... This also solves the issue where resting bodies would glitch through each other, since gravity is not cancelled out in time by the impulse before being added to the position.
             body.center_of_mass  = body.center_of_mass  + body.linear_velocity * dt;
             body.linear_velocity = body.linear_velocity + body.force * body.inverse_mass * dt;
+            body.impulse = { 0 }; // Reset the impulse every frame.
 
             //
             // Integrate the angular part.
@@ -685,7 +754,8 @@ void OpenProjectSimulator::update_game(float dt) {
 
             // Integrate the angular momentum
             body.angular_momentum = body.angular_momentum + dt * body.torque;
-
+            body.torque = { 0 }; // Reset the torque every frame.
+            
             // Integrate the inertia tensor.
             {
                 Mat3 rotation_matrix = mat3_from_quaternion(body.orientation);
@@ -820,7 +890,7 @@ void OpenProjectSimulator::debug_print() {
             printf("\n");
         }
 
-        printf("\n");
+        if(this->heat_grid.height) printf("\n");
     }
 
     if(this->draw_requests & DRAW_RIGID_BODIES) {

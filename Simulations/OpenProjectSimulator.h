@@ -62,7 +62,8 @@ struct Rigid_Body {
 	Vec3 size;
 
 	Vec3 force;
-	Vec3 torque;
+	Vec3 impulse;
+    Vec3 torque;
 	Vec3 linear_velocity;
 	Vec3 angular_velocity;
 	Vec3 angular_momentum;
@@ -81,7 +82,8 @@ struct Rigid_Body {
 	
 	void apply_force(Vec3 world_space_position, Vec3 force);
 	void apply_impulse(Vec3 world_space_position, Vec3 impulse);
-
+    void apply_torque(Vec3 torque);
+    
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
 };
 
@@ -144,6 +146,7 @@ public:
 
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
+    void apply_torque_to_rigid_body(int index, Vec3 torque);
 	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
 	void setup_game();
