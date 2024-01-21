@@ -40,7 +40,7 @@ struct SAT_Input {
 struct SAT_Result {
     bool found_collision;
     SAT_Scalar depth;
-    SAT_Vec3 normal;
+    SAT_Vec3 normal; // The normal from RHS towards LHS.
     SAT_Vec3 world_space_positions[4]; // A collision will always occur on an area in 3D space, and these positions are the corners of that area. All of them should cause a collision resolution, so that the whole area is reflected and not just a single point. Sometimes however, that area is so small that we represent it as either 2 points (e.g. edge-vs-face), or 1 point (e.g. corner-vs-face).
     int world_space_position_count;
 };
@@ -84,7 +84,7 @@ struct SAT_State {
     SAT_Vec3 center[SAT_BOX_COUNT];
     SAT_Vec3 unit_axis[SAT_BOX_COUNT][SAT_AXIS_COUNT];
     SAT_Vec3 scaled_axis[SAT_BOX_COUNT][SAT_AXIS_COUNT];
-    SAT_Vec3 a_to_b; // T := b.center - a.center
+    SAT_Vec3 lhs_to_rhs; // T := rhs.center - lhs.center
 
     SAT_Face significant_face[SAT_SIGNIFICANT_FACE_COUNT];
     

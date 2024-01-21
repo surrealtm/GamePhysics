@@ -416,9 +416,9 @@ void OpenProjectSimulator::setup_game() {
     if(true) {
         int a = this->create_rigid_body(Vec3(1, 1, 1), 1);
         int b = this->create_rigid_body(Vec3(4, 1, 4), 0);
-        this->warp_rigid_body(a, Vec3(0, 5, 0), Quat(0, 0, 0, 1));
-        //        this->warp_rigid_body(a, Vec3(0, 1, 0), Quat(0, 0, 1, 0)); // @Cleanup: This rotation currently breaks collision resolution...
-        //        this->apply_torque_to_rigid_body(a, Vec3(1, 0, 0)); // @Cleanup: This rotation is also pretty funny, but probably not right...
+        //this->warp_rigid_body(a, Vec3(0, 5, 0), Quat(0, 0, 0, 1));
+        this->warp_rigid_body(a, Vec3(0, 5, 0), Quat(0, 0, 1, 0)); // @Cleanup: This rotation currently breaks collision resolution...
+        this->apply_torque_to_rigid_body(a, Vec3(1, 0, 0)); // @Cleanup: This rotation is also pretty funny, but probably not right...
     }
     
     //
@@ -681,8 +681,6 @@ void OpenProjectSimulator::update_game(float dt) {
                 Real point_factor = 1.0 / (Real) result.world_space_position_count;
                 Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
                 
-                printf("Found a collision: Normal = " PRINT_FIXED_VEC3 ", Depth = " PRINT_FIXED_FLOAT "\n", contact_normal.x, contact_normal.y, contact_normal.z, result.depth);
-
                 //
                 // Handle each contact point.
                 //
@@ -699,6 +697,7 @@ void OpenProjectSimulator::update_game(float dt) {
                     // Do a proper collision response, by calculating the impulse between the two bodies,
                     // and applying the respective part to each of them.
                     //
+
                     const Real restitution = 0.5;
 
                     Vec3 collision_point_on_lhs = contact_point - lhs.center_of_mass; // xa

@@ -23,7 +23,7 @@ SAT_Vec3 sat_scaled_vec3(SAT_Vec3 vec, SAT_Scalar scale) {
     return { vec.x * scale, vec.y * scale, vec.z * scale };
 }
 
-SAT_Vec3 sat_negate_vec3(SAT_Vec3 vec) {
+SAT_Vec3 sat_negate(SAT_Vec3 vec) {
     return { -vec.x, -vec.y, -vec.z };
 } 
 
@@ -40,7 +40,7 @@ SAT_Vec3 sat_normalized_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
 
     SAT_Scalar magnitude = sqrt(result.x * result.x + result.y * result.y + result.z * result.z);
 
-    if(magnitude >= 0.0001f) {
+    if(magnitude >= 0.0001) {
         result.x /= magnitude;
         result.y /= magnitude;
         result.z /= magnitude;
@@ -108,7 +108,7 @@ SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
 bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     if(sat_dot(axis, axis) <= 0.00001) return false; // The axis was spawned from a cross product, but the two vectors were parallel, so no valid axis was created.
 
-    SAT_Scalar lhs = sat_abs(sat_dot(state->a_to_b, axis));
+    SAT_Scalar lhs = sat_abs(sat_dot(state->lhs_to_rhs, axis));
     SAT_Scalar rhs = 0;
 
     for(int i = 0; i < SAT_AXIS_COUNT; ++i) {
@@ -122,13 +122,16 @@ bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
         // We have found our new collision axis.
         state->penetration_depth = overlap;
         state->collision_normal  = axis;
+
+        // Ensure the collision normal always goes from RHS to LHS
+        if(sat_dot(state->lhs_to_rhs, axis) > 0.0) state->collision_normal = sat_negate(state->collision_normal);
     }
     
     return overlap < 0;
 }
 
 void __sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_index, SAT_Vec3 face_normal, SAT_Vec3 scaled_normal, SAT_Vec3 scaled_u, SAT_Vec3 scaled_v, SAT_Vec3 center) {
-    SAT_Vec3 signed_normal = (face_index == SAT_SIGNIFICANT_FACE_reference) ? sat_negate_vec3(state->collision_normal) : state->collision_normal; // The reference face should point the exact opposite way.
+    SAT_Vec3 signed_normal = (face_index == SAT_SIGNIFICANT_FACE_reference) ? sat_negate(state->collision_normal) : state->collision_normal; // The reference face should point the exact opposite way.
 
     SAT_Scalar dot = sat_dot(face_normal, signed_normal);
     if(dot > state->significant_face[face_index].face_normal_dot_collision_normal) {
@@ -217,7 +220,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     state.scaled_axis[SAT_B][1] = sat_scaled_vec3(state.unit_axis[SAT_B][1], rhs.size[1]);
     state.scaled_axis[SAT_B][2] = sat_scaled_vec3(state.unit_axis[SAT_B][2], rhs.size[2]);
     
-    state.a_to_b = sat_vec3(state.center[SAT_B].x - state.center[SAT_A].x,
+    state.lhs_to_rhs = sat_vec3(state.center[SAT_B].x - state.center[SAT_A].x,
                             state.center[SAT_B].y - state.center[SAT_A].y,
                             state.center[SAT_B].z - state.center[SAT_A].z);
 
@@ -271,7 +274,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
                 SAT_Vec3 scaled_v      = state.scaled_axis[i][j_plus_2];
                 
                 __sat_find_significant_face(&state, (SAT_Significant_Face) i, normal, scaled_normal, scaled_u, scaled_v, state.center[i]);
-                __sat_find_significant_face(&state, (SAT_Significant_Face) i, sat_negate_vec3(normal), sat_negate_vec3(scaled_normal), scaled_u, scaled_v, state.center[i]);
+                __sat_find_significant_face(&state, (SAT_Significant_Face) i, sat_negate(normal), sat_negate(scaled_normal), scaled_u, scaled_v, state.center[i]);
             }
         }
         
@@ -297,7 +300,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
                                                state.center[SAT_B].y + state.scaled_axis[SAT_B][i].y,
                                                state.center[SAT_B].z + state.scaled_axis[SAT_B][i].z };
 
-            SAT_Vec3 negative_plane_normal = sat_negate_vec3(state.unit_axis[SAT_B][i]);
+            SAT_Vec3 negative_plane_normal = sat_negate(state.unit_axis[SAT_B][i]);
             SAT_Vec3 negative_plane_center = { state.center[SAT_B].x - state.scaled_axis[SAT_B][i].x,
                                                state.center[SAT_B].y - state.scaled_axis[SAT_B][i].y,
                                                state.center[SAT_B].z - state.scaled_axis[SAT_B][i].z };
@@ -330,7 +333,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         
         result.found_collision = true;
         result.depth  = state.penetration_depth;
-        result.normal = state.collision_normal;
+        result.normal = state.significant_face[SAT_SIGNIFICANT_FACE_incident].face_normal;
         result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
     }
