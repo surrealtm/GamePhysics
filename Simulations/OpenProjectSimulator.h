@@ -144,6 +144,7 @@ public:
 
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
+	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
 	void setup_game();
 	void update_game(float dt);

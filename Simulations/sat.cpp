@@ -27,27 +27,6 @@ SAT_Vec3 sat_negate_vec3(SAT_Vec3 vec) {
     return { -vec.x, -vec.y, -vec.z };
 } 
 
-SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
-    SAT_Scalar rx = sat_turns_to_radians(x / 2);
-    SAT_Scalar ry = sat_turns_to_radians(y / 2);
-    SAT_Scalar rz = sat_turns_to_radians(z / 2);
-
-    SAT_Scalar cx = cos(rx);
-    SAT_Scalar cy = cos(ry);
-    SAT_Scalar cz = cos(rz);
-
-    SAT_Scalar sx = sin(rx);
-    SAT_Scalar sy = sin(ry);
-    SAT_Scalar sz = sin(rz);
-
-    SAT_Quat result;
-    result.x = sx * cy * cz - cx * sy * sz;
-    result.y = cx * sy * cz + sx * cy * sz;
-    result.z = cx * cy * sz - sx * sy * cz;
-    result.w = cx * cy * cz - sx * sy * sz;
-    return result;
-}
-
 SAT_Scalar sat_dot(SAT_Vec3 lhs, SAT_Vec3 rhs) {
     return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
 }
@@ -84,6 +63,31 @@ SAT_Vec3 sat_rotate(SAT_Quat quat, SAT_Vec3 vec) {
     SAT_Scalar rotated_z = 2 * u_dot_v * quat.z + (w_squared - u_dot_u) * vec.z + 2 * quat.w * u_cross_v_z;
 
     return { rotated_x, rotated_y, rotated_z };
+}
+
+SAT_Quat sat_quat(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z, SAT_Scalar w) {
+    return { x, y, z, w };
+}
+
+SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
+    SAT_Scalar rx = sat_turns_to_radians(x / 2);
+    SAT_Scalar ry = sat_turns_to_radians(y / 2);
+    SAT_Scalar rz = sat_turns_to_radians(z / 2);
+
+    SAT_Scalar cx = cos(rx);
+    SAT_Scalar cy = cos(ry);
+    SAT_Scalar cz = cos(rz);
+
+    SAT_Scalar sx = sin(rx);
+    SAT_Scalar sy = sin(ry);
+    SAT_Scalar sz = sin(rz);
+
+    SAT_Quat result;
+    result.x = sx * cy * cz - cx * sy * sz;
+    result.y = cx * sy * cz + sx * cy * sz;
+    result.z = cx * cy * sz - sx * sy * cz;
+    result.w = cx * cy * cz - sx * sy * sz;
+    return result;
 }
 
 
@@ -313,7 +317,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         result.found_collision = true;
         result.depth  = state.penetration_depth;
         result.normal = state.collision_normal;
-        result.world_space_position_count = 4;
+        result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
     }
     

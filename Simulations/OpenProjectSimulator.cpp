@@ -126,6 +126,14 @@ double get_current_time_in_milliseconds() {
     return (double) counter.QuadPart / win32_performance_frequency;
 }
 
+SAT_Input sat_input(Vec3 center, Quat orientation, Vec3 size) {
+    SAT_Input input;
+    input.center = sat_vec3(center.x, center.y, center.z);
+    input.orientation = sat_quat(orientation.x, orientation.y, orientation.z, orientation.w);
+    input.size = sat_vec3(size.x / 2, size.y / 2, size.z / 2); // The SAT expects the half_dimensions, whereas the transformation matrix expects the full_dimensions
+    return input;
+}
+
 
 //
 // Rigid Bodies.
@@ -288,9 +296,7 @@ void OpenProjectSimulator::reset() {
     
     this->heat_alpha = 0.5f; // Half decay.
 
-    this->setup_game();
-    
-    __sat_tests(); // @Cleanup: Remove this once the SAT works.
+    this->setup_game();    
 }
 
 void OpenProjectSimulator::drawFrame(ID3D11DeviceContext * context) {
@@ -378,6 +384,11 @@ void OpenProjectSimulator::apply_impulse_to_rigid_body(int index, Vec3 world_spa
     this->rigid_bodies[index].apply_impulse(world_space_position, impulse);
 }
 
+void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orientation) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    this->rigid_bodies[index].warp(position, orientation);
+}
+
 void OpenProjectSimulator::setup_game() {
     //
     // Set up the springs.
@@ -395,7 +406,9 @@ void OpenProjectSimulator::setup_game() {
     //
     if(true) {
         int a = this->create_rigid_body(Vec3(2, 1, 0.5), 10);
-        this->apply_impulse_to_rigid_body(a, Vec3(2, 0, 0), Vec3(0, 1, 0));
+        int b = this->create_rigid_body(Vec3(10, 1, 10), 0);
+        this->warp_rigid_body(a, Vec3(0, 5, 0), Quat(0, 0, 0, 1));
+        this->apply_impulse_to_rigid_body(a, Vec3(0, 5, 0), Vec3(0, -1, 0));
     }
     
     //
@@ -630,6 +643,22 @@ void OpenProjectSimulator::update_game(float dt) {
         // Resolve collisions between the rigid bodies.
         // @Incomplete.
         //
+        for(int i = 0; i < this->rigid_body_count; ++i) {
+            Rigid_Body & lhs = this->rigid_bodies[i];
+            SAT_Input sat_lhs = sat_input(lhs.center_of_mass, lhs.orientation, lhs.size);
+
+            for(int j = i + 1; j < this->rigid_body_count; ++j) {
+                Rigid_Body & rhs = this->rigid_bodies[j];
+                SAT_Input sat_rhs = sat_input(rhs.center_of_mass, rhs.orientation, rhs.size);
+                
+                if(lhs.inverse_mass == 0 && rhs.inverse_mass == 0) continue; // Don't do collisions between two static objects.
+
+                SAT_Result result = sat(sat_lhs, sat_rhs);
+                if(!result.found_collision) continue;
+                
+                lhs.apply_impulse(lhs.center_of_mass, Vec3(0, 1, 0));
+            }
+        }
 
         //
         // Integrate all rigid bodies.
