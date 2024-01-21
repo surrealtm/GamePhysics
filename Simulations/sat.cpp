@@ -118,7 +118,7 @@ bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
 
     SAT_Scalar overlap = rhs - lhs; // A negative value means there is a gap, no overlap.
 
-    if(overlap >= 0 && overlap < state->penetration_depth) {
+    if(overlap > 0 && overlap < state->penetration_depth) {
         // We have found our new collision axis.
         state->penetration_depth = overlap;
         state->collision_normal  = axis;
@@ -278,6 +278,14 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
             }
         }
         
+        if(state.significant_face[SAT_SIGNIFICANT_FACE_incident].face_normal_dot_collision_normal > state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal_dot_collision_normal) {
+            // If the current incident face is more parallel to the collision normal than
+            // the reference face, swap these two for better collision resolution.
+            SAT_Face tmp = state.significant_face[SAT_SIGNIFICANT_FACE_incident];
+            state.significant_face[SAT_SIGNIFICANT_FACE_incident]  = state.significant_face[SAT_SIGNIFICANT_FACE_reference];
+            state.significant_face[SAT_SIGNIFICANT_FACE_reference] = tmp;
+        }
+
         //
         // Do the Sutherland-Hodgman Clipping to find the polygon which actually overlaps the two boxes.
         // This polygon then determines the contact points.
@@ -333,9 +341,23 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         
         result.found_collision = true;
         result.depth  = state.penetration_depth;
-        result.normal = state.significant_face[SAT_SIGNIFICANT_FACE_incident].face_normal;
+        result.normal = sat_negate(state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal);
+        
+#if false
         result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
+#else
+        //
+        // Find the one average position of the contact area for a simpler collision resolution.
+        //
+        result.world_space_position_count = 1;
+        result.world_space_positions[0] = sat_vec3(0, 0, 0);
+        for(int i = 0; i < 4; ++i) {
+            result.world_space_positions[0].x += state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i].x / 4;
+            result.world_space_positions[0].y += state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i].y / 4;
+            result.world_space_positions[0].z += state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i].z / 4;
+        }
+#endif
     }
     
     //

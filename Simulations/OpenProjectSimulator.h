@@ -27,7 +27,10 @@ Vec3 mat3_mul_vec3(Mat3 & lhs, Vec3 & rhs);
 Mat3 mat3_tranpose(Mat3 & input);
 Mat3 mat3_inverse(Mat3 & input);
 
-Vec3 lerp(Vec3 from, Vec3 to, float t);
+Real turns_to_radians(Real value);
+Quat quat_from_euler_angles(Real x, Real y, Real z);
+
+Vec3 lerp(Vec3 from, Vec3 to, Real t);
 float clamp_float(float value, float min, float max);
 float random_float(float min, float max);
 int random_int(int min, int max);
@@ -62,9 +65,11 @@ struct Rigid_Body {
 	Vec3 size;
 
 	Vec3 force;
-	Vec3 impulse;
-    Vec3 torque;
-	Vec3 linear_velocity;
+	Vec3 linear_impulse;
+    Vec3 linear_velocity;
+	
+	Vec3 torque;
+	Vec3 angular_impulse;
 	Vec3 angular_velocity;
 	Vec3 angular_momentum;
 	
@@ -79,7 +84,8 @@ struct Rigid_Body {
 	void create(Vec3 size, Real mass);
 	void warp(Vec3 center, Quat orientation);
 	void build_transformation_matrix();
-	
+    void build_inertia_tensor();
+    
 	void apply_force(Vec3 world_space_position, Vec3 force);
 	void apply_impulse(Vec3 world_space_position, Vec3 impulse);
     void apply_torque(Vec3 torque);
@@ -194,4 +200,8 @@ private:
 	//
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
+
+    // @@Debug: For debugging the Rigid Body collision system.
+    Vec3 contact_points_to_draw[4];
+    int contact_points_to_draw_count;
 };
