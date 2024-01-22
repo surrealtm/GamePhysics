@@ -154,11 +154,13 @@ public:
     void apply_torque_to_rigid_body(int index, Vec3 torque);
 	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
-	void setup_game();
+	void setup_demo_scene(); // Fuck you dennis.
 	void setupHeatGrid();
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
+	
+	void setup_game();
 	void update_game(float dt);
 	void draw_game();
 

@@ -391,7 +391,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         if(sat_dot(state.lhs_to_rhs, result.normal) > 0.0) result.normal = sat_negate(result.normal);
     
 #if false
-        result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
+        result.world_space_position_count = 4; // @Robustness: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
 #else
         //

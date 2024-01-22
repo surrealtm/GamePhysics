@@ -329,7 +329,6 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
 }
 
 void OpenProjectSimulator::reset() {
-    // @Incomplete.
     this->draw_requests = DRAW_EVERYTHING;
 
     this->masspoint_count = 0;
@@ -474,11 +473,8 @@ void OpenProjectSimulator::setup_demo_scene() {
         wall_east .warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
         wall_west .warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
 
-        // @Cleanup: Seems the order in which rigid bodies are created has an impact on
-        // collision detection (?), or collision resolution, not sure which. I fear the
-        // latter one, since maybe the normal is fucked or something...
-        for(int i = 0; i < 1; ++i) {
-            Rigid_Body & ball       = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
+        for(int i = 0; i < 10; ++i) {
+            Rigid_Body & ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
             ball.warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
             ball.apply_angular_impulse(Vec3(1, 1, 1));
         }
@@ -493,19 +489,68 @@ void OpenProjectSimulator::setup_demo_scene() {
         this->heat_grid.create(16, 16);
         this->heat_grid.randomize();
     }
+}
+
+void OpenProjectSimulator::setupHeatGrid()
+{
+    heat_grid.create(10, 10);
+    
+}
+
+void OpenProjectSimulator::setupWalls()
+{
+    float heatgrid_width = heat_grid.width * heat_grid.scale;
+    float heatgrid_height = heat_grid.height * heat_grid.scale;
+
+    Rigid_Body *wallNorth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    Rigid_Body *wallSouth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 2, 0), Quat(0, 0, 0, 1));
+    wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -3, 0), Quat(0, 0, 0, 1));
+
+
+    normal_walls[0] = *wallNorth;
+    normal_walls[1] = *wallSouth;
+    
+    Rigid_Body *goalLeft = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    Rigid_Body *goalRight = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    goalLeft->warp(Vec3(-3, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
+    goalRight->warp(Vec3(heatgrid_width + 2, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
+
+
+    goals[0] = *goalLeft;
+    goals[1] = *goalRight;
+}
+
+void OpenProjectSimulator::setupPlayerPlatforms()
+{
+    
+}
+
+void OpenProjectSimulator::setupBall()
+{
+    ballIndex = OpenProjectSimulator::create_rigid_body(Vec3(0.5f, 0.5f, 0.5f), 1.0f);
+    ball = OpenProjectSimulator::query_rigid_body(ballIndex);
+
+}
 
 void OpenProjectSimulator::setup_game() {
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+    
+    // 
+    // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
+    // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
+    //
+    this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
 void OpenProjectSimulator::update_game(float dt) {
-    // @Incomplete
+    // @Incomplete: Add external forces to each masspoint and rigid body.
+    
     //
     // Update the mass-spring-system using the Midpoint method.
-    // @Incomplete: Add external forces to each masspoint.
     //
     {        std::cout << OpenProjectSimulator::ball.center_of_mass << std::endl;
         std::cout << OpenProjectSimulator::query_rigid_body(ballIndex).center_of_mass << std::endl;
@@ -717,13 +762,13 @@ void OpenProjectSimulator::update_game(float dt) {
     //
     {
         //
-        // Add velocity and external forces to all rigid bodies.
+        // Add gravity and external forces to all rigid bodies.
         //
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
     	    if(body.inverse_mass == 0) continue;
             
-            // @Incomplete: Add external forces.
+            body.linear_velocity.y += dt * this->gravity;
         }
 
         //
@@ -854,8 +899,6 @@ void OpenProjectSimulator::update_game(float dt) {
 }
 
 void OpenProjectSimulator::draw_game() {
-    // @Incomplete.
-
     //
     // Draw all masspoints and springs if requested.
     //
