@@ -4,7 +4,7 @@
 
 #define SIMULATOR_UPDATES_PER_SECOND 100
 #define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
-#define USE_FIXED_DT false // :TimeStep
+#define USE_FIXED_DT true // :TimeStep
 
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
@@ -63,22 +63,19 @@ struct Rigid_Body {
 	Vec3 center_of_mass;
 	Quat orientation;
 	Vec3 size;
-
-	Vec3 force;
-	Vec3 linear_impulse;
-    Vec3 linear_velocity;
-	
-	Vec3 torque;
-	Vec3 angular_impulse;
-	Vec3 angular_velocity;
-	Vec3 angular_momentum;
 	
 	Mat4 transformation;
 	Mat3 inverse_inertia;
-
-	Real inverse_mass;
 	Mat3 inverse_I0;
-
+	Real inverse_mass;
+	
+	Vec3 frame_force;
+	Vec3 linear_velocity;
+	
+	Vec3 frame_torque;
+	Vec3 angular_velocity; 
+	Vec3 angular_momentum;
+	
 	Vec3 albedo;
 
 	void create(Vec3 size, Real mass);

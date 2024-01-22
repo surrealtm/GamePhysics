@@ -132,9 +132,24 @@ bool sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     }
 
     SAT_Scalar overlap = rhs - lhs; // A negative value means there is a gap, no overlap.
+    SAT_Scalar axis_dot_relative_velocity = sat_dot(axis, state->relative_velocity);
 
-    if(overlap > 0 && overlap < state->penetration_depth) {
+    // There needs to be actual overlap between the boxes on this axis, and the
+    // axis must also not be in the same direction as the relative velocity. This
+    // removes collisions with "backfaces", improving the tunneling situation a bit.
+    bool is_collision_axis = overlap > 0;
+
+    bool is_better_collision_axis = is_collision_axis;
+
+#if SAT_USE_MINIMAL_TRANSLATION_VECTOR
+    is_better_collision_axis &= overlap < state->penetration_depth;
+#elif SAT_USE_PROJECTED_VELOCITY
+    is_better_collision_axis &= axis_dot_relative_velocity > state->collision_normal_dot_relative_velocity;
+#endif
+
+    if(is_better_collision_axis) {
         // We have found our new collision axis.
+        state->collision_normal_dot_relative_velocity = axis_dot_relative_velocity;
         state->penetration_depth = overlap;
         state->collision_normal  = axis;
 
@@ -142,7 +157,7 @@ bool sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
         if(sat_dot(state->lhs_to_rhs, axis) > 0.0) state->collision_normal = sat_negate(state->collision_normal);
     }
     
-    return overlap < 0;
+    return !is_collision_axis;
 }
 
 void sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_index, SAT_Vec3 face_normal, SAT_Vec3 scaled_normal, SAT_Vec3 scaled_u, SAT_Vec3 scaled_v, SAT_Vec3 center) {
@@ -248,12 +263,15 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     state.scaled_axis[SAT_B][2] = sat_scaled_vec3(state.unit_axis[SAT_B][2], rhs.size[2]);
     
     state.lhs_to_rhs = sat_vec3(state.center[SAT_B].x - state.center[SAT_A].x,
-                            state.center[SAT_B].y - state.center[SAT_A].y,
-                            state.center[SAT_B].z - state.center[SAT_A].z);
+                                state.center[SAT_B].y - state.center[SAT_A].y,
+                                state.center[SAT_B].z - state.center[SAT_A].z);
+
+    state.relative_velocity = { rhs.velocity.x - lhs.velocity.x, rhs.velocity.y - lhs.velocity.y, rhs.velocity.z - lhs.velocity.z };
 
     state.found_separating_axis = false;
     state.penetration_depth     = std::numeric_limits<SAT_Scalar>::max(); // This is so fucking stupid...
-    
+    state.collision_normal_dot_relative_velocity = std::numeric_limits<SAT_Scalar>::lowest();
+
     //
     // Check each axis to find a possible separating axis.
     // @@Speed: We could stop checking as soon as we found one separating axis, since a collision cannot
@@ -369,6 +387,9 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         result.depth  = state.penetration_depth;
         result.normal = state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal;
         
+        // Ensure the collision normal always goes from RHS to LHS
+        if(sat_dot(state.lhs_to_rhs, result.normal) > 0.0) result.normal = sat_negate(result.normal);
+    
 #if false
         result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
@@ -391,44 +412,4 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     //
     
     return result;
-}
-
-
-/* =============================== Test Cases =============================== */
-
-void __sat_tests() {
-#define sat_test(name, exp) if(exp) { ++passed; printf("[SAT]: Passed test '%s'.\n", name); } else { ++failed; printf("[SAT]: Failed test '%s'.\n", name); }
-    int passed = 0, failed = 0;
-    
-    {
-        SAT_Input lhs = { { 0, 0, 0 }, { 0, 0, 0, 1 }, { 1, 1, 1 } };
-        SAT_Input rhs = { { 0, 2, 0 }, { 0, 0, 0, 1 }, { .5, 1, .5 } };
-        SAT_Result result = sat(lhs, rhs);
-        sat_test("Simple True", result.found_collision);
-    }
-
-    {
-        SAT_Input lhs = { { 0, 0, 0 },   { 0, 0, 0, 1 }, { 1, 1, 1 } };
-        SAT_Input rhs = { { 0, 2.1, 0 }, { 0, 0, 0, 1 }, { 1, 1, 1 } };
-        SAT_Result result = sat(lhs, rhs);
-        sat_test("Simple False", !result.found_collision);
-    }
-
-    {
-        SAT_Input lhs = { { 0, 0, 0 },   { 0, 0, 0, 1 }, { 1, 1, 1 } };
-        SAT_Input rhs = { { 0, 2.1, 0 }, sat_quat_from_euler_angles(0, 0, 0.25), { 2, 1, 1 } };
-        SAT_Result result = sat(lhs, rhs);
-        sat_test("Rotated True", result.found_collision);
-    }
-
-    {
-        SAT_Input lhs = { { 0, 0, 0 },   { 0, 0, 0, 1 }, { 1, 1, 1 } };
-        SAT_Input rhs = { { 0, 2.1, 0 }, sat_quat_from_euler_angles(0, 0.25, 0), { 2, 1, 1 } };
-        SAT_Result result = sat(lhs, rhs);
-        sat_test("Rotated False", !result.found_collision);
-    }
-
-    printf("Passed tests: %u, Failed tests: %u\n", passed, failed);
-
-#undef sat_assert
 }

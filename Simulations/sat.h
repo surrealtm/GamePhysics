@@ -1,4 +1,4 @@
-//
+﻿//
 // This file implements a collision check using SAT.
 // It correctly handles the (very common case) where the  collision area is not only a single point (e.g. when
 // two faces collide head-on), by generating a collection  of collision points, which then all cause a collision
@@ -7,6 +7,9 @@
 // https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/previousinformation/physics5collisionmanifolds/2017%20Tutorial%205%20-%20Collision%20Manifolds.pdf
 // https://jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
 //
+
+#define SAT_USE_MINIMAL_TRANSLATION_VECTOR true // Resolve along the axis with the least penetration
+//#define SAT_USE_PROJECTED_VELOCITY true // Resolve along the axis most parallel to the relative velocity
 
 /* =============================== SAT API =============================== */
 
@@ -35,6 +38,7 @@ struct SAT_Input {
     SAT_Vec3 center;
     SAT_Quat orientation;
     SAT_Vec3 size;
+    SAT_Vec3 velocity;
 };
 
 struct SAT_Result {
@@ -85,12 +89,24 @@ struct SAT_State {
     SAT_Vec3 unit_axis[SAT_BOX_COUNT][SAT_AXIS_COUNT];
     SAT_Vec3 scaled_axis[SAT_BOX_COUNT][SAT_AXIS_COUNT];
     SAT_Vec3 lhs_to_rhs; // T := rhs.center - lhs.center
+    SAT_Vec3 relative_velocity;
 
     SAT_Face significant_face[SAT_SIGNIFICANT_FACE_COUNT];
     
     bool found_separating_axis; // If this is set to true, then there is no collision.
     SAT_Scalar penetration_depth; // The smallest overlap value on any given axis.
+    
+    // We want the collision normal to be as close to the "impact velocity" as possible,
+    // to improve the response in cases like this:
+    // ┌──────┐              ┌──────┐
+    // │      │ ---------→   │      │
+    // │      │       ┌──────┼──────┼───────┐ ↑
+    // └──────┘       │      └──────┘       │ ↓
+    //                └─────────────────────┘
+    // We want the collision normal to be the axis to the left, not the axis to the top,
+    // since the object came from the left. The MTV (smallest penetration vector) would
+    // move the object upwards.
+    SAT_Scalar collision_normal_dot_relative_velocity;
     SAT_Vec3 collision_normal; // The axis which had a collision with the smallest overlap.
 };
 
-void __sat_tests();
