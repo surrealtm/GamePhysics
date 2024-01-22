@@ -8,7 +8,7 @@
 
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
-#define MAX_RIGID_BODIES  8
+#define MAX_RIGID_BODIES 16
 
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
@@ -88,6 +88,7 @@ struct Rigid_Body {
     
 	void apply_force(Vec3 world_space_position, Vec3 force);
 	void apply_impulse(Vec3 world_space_position, Vec3 impulse);
+	void apply_angular_impulse(Vec3 impulse);
     void apply_torque(Vec3 torque);
     
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
@@ -162,7 +163,10 @@ public:
 	void debug_print();
 
 private:
-	//
+    Rigid_Body & query_rigid_body(int index);
+    Rigid_Body & create_and_query_rigid_body(Vec3 size, Real mass);
+
+    //
 	// :TimeStep
 	// Since this is supposed to be a game, we definitely want the simulation to run
 	// frame-rate-independent. Everything else is just really dumb, since a faster computer
@@ -200,8 +204,4 @@ private:
 	//
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
-
-    // @@Debug: For debugging the Rigid Body collision system.
-    Vec3 contact_points_to_draw[4];
-    int contact_points_to_draw_count;
 };

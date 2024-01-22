@@ -259,6 +259,10 @@ void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
 	this->angular_impulse += cross(position_relative_to_center, impulse);
 }
 
+void Rigid_Body::apply_angular_impulse(Vec3 impulse) {
+    this->angular_impulse += impulse;
+}
+
 void Rigid_Body::apply_torque(Vec3 torque) {
 	this->torque += torque;
 }
@@ -266,7 +270,7 @@ void Rigid_Body::apply_torque(Vec3 torque) {
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
-	return this->linear_velocity + cross(position_relative_to_center, this->angular_velocity);
+	return this->linear_velocity + cross(this->angular_velocity, position_relative_to_center);
 }
 
 
@@ -362,8 +366,6 @@ void OpenProjectSimulator::reset() {
     this->rigid_body_count = 0;
     
     this->heat_alpha = 0.5f; // Half decay.
-
-    this->contact_points_to_draw_count = 0; // @@Debug
     
     this->setup_game();    
 }
@@ -443,6 +445,15 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass) {
     return index;
 }
 
+Rigid_Body & OpenProjectSimulator::query_rigid_body(int index) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    return this->rigid_bodies[index];
+}
+
+Rigid_Body & OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass));
+}
+
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
     assert(index >= 0 && index < this->masspoint_count);
     this->masspoints[index].velocity += impulse;
@@ -478,11 +489,28 @@ void OpenProjectSimulator::setup_game() {
     //
     // Set up a rigid body.
     //
-    if(true) {
-        int a = this->create_rigid_body(Vec3(1, 1, 1), 1);
-        int b = this->create_rigid_body(Vec3(1, 1, 1), 0);
-        this->warp_rigid_body(a, Vec3(.5, 1.5, 0), quat_from_euler_angles(0, 0, 0));
-        this->gravity = -1;
+    if(true) {        
+        Rigid_Body & floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0);
+        Rigid_Body & wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
+        Rigid_Body & wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
+        Rigid_Body & wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
+        Rigid_Body & wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
+        
+        wall_north.warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
+        wall_south.warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
+        wall_east .warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
+        wall_west .warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
+
+        // @Cleanup: Seems the order in which rigid bodies are created has an impact on
+        // collision detection (?), or collision resolution, not sure which. I fear the
+        // latter one, since maybe the normal is fucked or something...
+        for(int i = 0; i < 1; ++i) {
+            Rigid_Body & ball       = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
+            ball.warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
+            ball.apply_angular_impulse(Vec3(1, 1, 1));
+        }
+        
+        this->gravity = -10;
     }
     
     //
@@ -683,9 +711,9 @@ void OpenProjectSimulator::update_game(float dt) {
         //
         // Set up the matrix solver.
         //
-        float pcg_target_residual = 1e-05;
-        float pcg_max_iterations  = 1000;
-        float ret_pcg_residual    = 1e10;
+        float pcg_target_residual = 1e-05f;
+        float pcg_max_iterations  = 1000.f;
+        float ret_pcg_residual    = 1e10f;
         int ret_pcg_iterations  = -1;
 
         SparsePCGSolver<float> solver;
@@ -742,10 +770,6 @@ void OpenProjectSimulator::update_game(float dt) {
                 SAT_Result result = sat(sat_lhs, sat_rhs);
                 if(!result.found_collision) continue;
                 
-                // @@Debug
-                this->contact_points_to_draw_count = result.world_space_position_count;
-                memcpy(&this->contact_points_to_draw[0], &result.world_space_positions[0], sizeof(this->contact_points_to_draw));
-
                 Real point_factor = 1.0 / (Real) result.world_space_position_count;
                 Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
                 
@@ -766,7 +790,7 @@ void OpenProjectSimulator::update_game(float dt) {
                     // and applying the respective part to each of them.
                     //
 
-                    const Real restitution = 0.5;
+                    const Real restitution = 1;
 
                     Vec3 collision_point_on_lhs = contact_point - lhs.center_of_mass; // xa
                     Vec3 collision_point_on_rhs = contact_point - rhs.center_of_mass; // xb
@@ -790,13 +814,6 @@ void OpenProjectSimulator::update_game(float dt) {
 
                     lhs.apply_impulse(contact_point,  impulse);
                     rhs.apply_impulse(contact_point, -impulse);
-
-                    printf("=== Collision ===\n");
-                    printf("  > World Space Contact: %f, %f, %f\n", contact_point.x, contact_point.y, contact_point.z);
-                    printf("  > Relative Velocity: %f, %f, %f\n", relative_velocity.x, relative_velocity.y, relative_velocity.z);
-                    printf("  > Applying impulse: %f, %f, %f\n", impulse.x, impulse.y, impulse.z);
-                    printf("  > LHS Angular Impulse: %f, %f, %f\n", lhs.angular_impulse.x, lhs.angular_impulse.y, lhs.angular_impulse.z);
-                    printf("  > RHS Angular Impulse: %f, %f, %f\n", rhs.angular_impulse.x, rhs.angular_impulse.y, rhs.angular_impulse.z);
                 }
             }
         }
@@ -935,15 +952,6 @@ void OpenProjectSimulator::draw_game() {
             this->DUC->setUpLighting(Vec3(0, 0, 0), body.albedo, 0.2, body.albedo);
             this->DUC->drawRigidBody(body.transformation);
         }
-    }
-
-    // @@Debug
-
-    for(int i = 0; i < this->contact_points_to_draw_count; ++i) {
-        Vec3 color = Vec3(1, 0, 0);
-        Vec3 scale = Vec3(0.1, 0.1, 0.1);
-        this->DUC->setUpLighting(Vec3(0, 0, 0), color, 5, color);
-        this->DUC->drawSphere(this->contact_points_to_draw[i], scale);
     }
 }
 

@@ -49,6 +49,21 @@ SAT_Vec3 sat_normalized_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
     return result;
 }
 
+bool sat_ray_plane_intersection(SAT_Vec3 plane_center, SAT_Vec3 plane_normal, SAT_Vec3 ray_origin, SAT_Vec3 ray_direction, SAT_Vec3 *result) {
+    SAT_Scalar denom = sat_dot(plane_normal, ray_direction);
+    if(sat_abs(denom) <= 0.0001) return false;
+
+    SAT_Vec3 delta = sat_vec3(plane_center.x - ray_origin.x, plane_center.y - ray_origin.y, plane_center.z - ray_origin.z);
+    SAT_Scalar t = sat_dot(delta, plane_normal) / denom;
+
+    if(sat_abs(t) <= 0.0001) return false;
+
+    result->x = ray_origin.x + t * ray_direction.x;
+    result->y = ray_origin.y + t * ray_direction.y;
+    result->z = ray_origin.z + t * ray_direction.z;
+    return true;
+}
+
 SAT_Vec3 sat_rotate(SAT_Quat quat, SAT_Vec3 vec) {
     // The formal math to rotate a vector by a quaternion would be
     // v' = q * v * q'
@@ -105,7 +120,7 @@ SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
 
 // The collision normal is always supposed to be the face normal of LHS. If we are checking a normal
 // of RHS, then we need to flip that normal around for the result.
-bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
+bool sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     if(sat_dot(axis, axis) <= 0.00001) return false; // The axis was spawned from a cross product, but the two vectors were parallel, so no valid axis was created.
 
     SAT_Scalar lhs = sat_abs(sat_dot(state->lhs_to_rhs, axis));
@@ -130,7 +145,7 @@ bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     return overlap < 0;
 }
 
-void __sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_index, SAT_Vec3 face_normal, SAT_Vec3 scaled_normal, SAT_Vec3 scaled_u, SAT_Vec3 scaled_v, SAT_Vec3 center) {
+void sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_index, SAT_Vec3 face_normal, SAT_Vec3 scaled_normal, SAT_Vec3 scaled_u, SAT_Vec3 scaled_v, SAT_Vec3 center) {
     SAT_Vec3 signed_normal = (face_index == SAT_SIGNIFICANT_FACE_incident) ? sat_negate(state->collision_normal) : state->collision_normal; // The reference face should point the exact opposite way.
 
     SAT_Scalar dot = sat_dot(face_normal, signed_normal);
@@ -173,7 +188,7 @@ void __sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_ind
     }
 }
 
-SAT_Vec3 __sat_clip_point_against_plane(SAT_Vec3 point, SAT_Vec3 plane_center, SAT_Vec3 plane_normal) {
+SAT_Vec3 sat_clip_point_against_plane(SAT_Vec3 point, SAT_Vec3 edge_direction, SAT_Vec3 plane_center, SAT_Vec3 plane_normal) {
     //
     // Check if the point is "inside" the plane like this:
     //   P *      | -> Face
@@ -183,12 +198,24 @@ SAT_Vec3 __sat_clip_point_against_plane(SAT_Vec3 point, SAT_Vec3 plane_center, S
     if(dot <= 0.0) return point; // No clipping required.
 
     //
-    // The point is "outside" the plane, project it onto the plane to clip it.
+    // The point is "outside" the plane, clip it onto the plane.
     //
-    SAT_Vec3 projected_point = { point.x - dot * plane_normal.x,
-                                 point.y - dot * plane_normal.y,
-                                 point.z - dot * plane_normal.z };
+    SAT_Vec3 projected_point;
+    bool valid_intersection = sat_ray_plane_intersection(plane_center, plane_normal, point, edge_direction, &projected_point);
+    if(!valid_intersection) return point; // No clipping possible.
+    
     return projected_point;
+}
+
+void sat_clip_incident_corners_against_plane(SAT_State *state, SAT_Vec3 plane_center, SAT_Vec3 plane_normal) {
+    SAT_Vec3 *corners = state->significant_face[SAT_SIGNIFICANT_FACE_incident].corners;
+    SAT_Vec3 u = sat_vec3(corners[1].x - corners[0].x, corners[1].y - corners[0].y, corners[1].z - corners[0].z);
+    SAT_Vec3 v = sat_vec3(corners[3].x - corners[0].x, corners[3].y - corners[0].y, corners[3].z - corners[0].z);
+    
+    for(int i = 0; i < 4; ++i) {
+        corners[i] = sat_clip_point_against_plane(corners[i], u, plane_center, plane_normal);
+        corners[i] = sat_clip_point_against_plane(corners[i], v, plane_center, plane_normal);
+    }
 }
 
 
@@ -234,23 +261,21 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     //
     for(int i = 0; i < SAT_AXIS_COUNT; ++i) {
         // Check each of the boxes axis.
-        state.found_separating_axis |= __sat_is_separating_axis(&state, state.unit_axis[SAT_A][i]);
-        state.found_separating_axis |= __sat_is_separating_axis(&state, state.unit_axis[SAT_B][i]);
+        state.found_separating_axis |= sat_is_separating_axis(&state, state.unit_axis[SAT_A][i]);
+        state.found_separating_axis |= sat_is_separating_axis(&state, state.unit_axis[SAT_B][i]);
 
         // Check some edge-to-edge axis.
-        state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][i], state.unit_axis[SAT_B][i]));
+        state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][i], state.unit_axis[SAT_B][i]));
     }
         
     // Check the remaining edge-to-edge axis.
-    /* nocheckin
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Y]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Z]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_Z]));
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Y]));
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Z]));
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_Z]));
 
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_Y]));
-    */
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_X]));
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_X]));
+    state.found_separating_axis |= sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_Y]));
 
     //
     // If we have not found a separating axis, it means that there is a collision.
@@ -275,17 +300,20 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
                 SAT_Vec3 scaled_u      = state.scaled_axis[i][j_plus_1];
                 SAT_Vec3 scaled_v      = state.scaled_axis[i][j_plus_2];
                 
-                __sat_find_significant_face(&state, (SAT_Significant_Face) i, normal, scaled_normal, scaled_u, scaled_v, state.center[i]);
-                __sat_find_significant_face(&state, (SAT_Significant_Face) i, sat_negate(normal), sat_negate(scaled_normal), scaled_u, scaled_v, state.center[i]);
+                sat_find_significant_face(&state, (SAT_Significant_Face) i, normal, scaled_normal, scaled_u, scaled_v, state.center[i]);
+                sat_find_significant_face(&state, (SAT_Significant_Face) i, sat_negate(normal), sat_negate(scaled_normal), scaled_u, scaled_v, state.center[i]);
             }
         }
         
+        SAT_Box_Index clipping_box = SAT_B;
+
         if(state.significant_face[SAT_SIGNIFICANT_FACE_incident].face_normal_dot_collision_normal > state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal_dot_collision_normal) {
             // If the current incident face is more parallel to the collision normal than
             // the reference face, swap these two for better collision resolution.
             SAT_Face tmp = state.significant_face[SAT_SIGNIFICANT_FACE_incident];
             state.significant_face[SAT_SIGNIFICANT_FACE_incident]  = state.significant_face[SAT_SIGNIFICANT_FACE_reference];
             state.significant_face[SAT_SIGNIFICANT_FACE_reference] = tmp;
+            clipping_box = SAT_A;
         }
 
         //
@@ -305,20 +333,18 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
 
 
         for(int i = 0; i < SAT_AXIS_COUNT; ++i) {
-            SAT_Vec3 positive_plane_normal = state.unit_axis[SAT_B][i];
-            SAT_Vec3 positive_plane_center = { state.center[SAT_B].x + state.scaled_axis[SAT_B][i].x,
-                                               state.center[SAT_B].y + state.scaled_axis[SAT_B][i].y,
-                                               state.center[SAT_B].z + state.scaled_axis[SAT_B][i].z };
+            SAT_Vec3 positive_plane_normal = state.unit_axis[clipping_box][i];
+            SAT_Vec3 positive_plane_center = { state.center[clipping_box].x + state.scaled_axis[clipping_box][i].x,
+                                               state.center[clipping_box].y + state.scaled_axis[clipping_box][i].y,
+                                               state.center[clipping_box].z + state.scaled_axis[clipping_box][i].z };
 
-            SAT_Vec3 negative_plane_normal = sat_negate(state.unit_axis[SAT_B][i]);
-            SAT_Vec3 negative_plane_center = { state.center[SAT_B].x - state.scaled_axis[SAT_B][i].x,
-                                               state.center[SAT_B].y - state.scaled_axis[SAT_B][i].y,
-                                               state.center[SAT_B].z - state.scaled_axis[SAT_B][i].z };
+            SAT_Vec3 negative_plane_normal = sat_negate(state.unit_axis[clipping_box][i]);
+            SAT_Vec3 negative_plane_center = { state.center[clipping_box].x - state.scaled_axis[clipping_box][i].x,
+                                               state.center[clipping_box].y - state.scaled_axis[clipping_box][i].y,
+                                               state.center[clipping_box].z - state.scaled_axis[clipping_box][i].z };
 
-            for(int j = 0; j < 4; ++j) {
-                state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[j] = __sat_clip_point_against_plane(state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[j], positive_plane_center, positive_plane_normal);
-                state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[j] = __sat_clip_point_against_plane(state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[j], negative_plane_center, negative_plane_normal);
-            }
+            sat_clip_incident_corners_against_plane(&state, positive_plane_center, positive_plane_normal);
+            sat_clip_incident_corners_against_plane(&state, negative_plane_center, negative_plane_normal);
         }
         
         //
@@ -332,9 +358,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         {
             SAT_Vec3 plane_center = state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_center;
             SAT_Vec3 plane_normal = state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal;
-            for(int i = 0; i < 4; ++i) {
-                state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i] = __sat_clip_point_against_plane(state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i], plane_center, plane_normal);
-            }
+            sat_clip_incident_corners_against_plane(&state, plane_center, plane_normal);
         }
 
         //
