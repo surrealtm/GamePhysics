@@ -100,6 +100,7 @@ struct Rigid_Body {
 
 struct Heat_Grid {
 	int width = 0, height = 0;
+	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
 
 	void create(int width, int height);
@@ -203,6 +204,9 @@ private:
 	Rigid_Body rigid_bodies[MAX_RIGID_BODIES];
 	int rigid_body_count;
 
+	Rigid_Body normal_walls[2];
+
+	Rigid_Body goals[2];
 	//
 	// Heat Diffusion.
 	//

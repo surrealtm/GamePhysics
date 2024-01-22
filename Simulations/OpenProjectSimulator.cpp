@@ -357,7 +357,6 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
 void OpenProjectSimulator::reset() {
     // @Incomplete.
     this->draw_requests = DRAW_EVERYTHING;
-    this->gravity = -10.0f;
 
     this->masspoint_count = 0;
     this->spring_count    = 0;
@@ -482,7 +481,26 @@ void OpenProjectSimulator::setupHeatGrid()
 
 void OpenProjectSimulator::setupWalls()
 {
+    float heatgrid_width = heat_grid.width * heat_grid.scale;
+    float heatgrid_height = heat_grid.height * heat_grid.scale;
+
+    Rigid_Body *wallNorth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    Rigid_Body *wallSouth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 2, 0), Quat(0, 0, 0, 1));
+    wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -3, 0), Quat(0, 0, 0, 1));
+
+
+    normal_walls[0] = *wallNorth;
+    normal_walls[1] = *wallSouth;
     
+    Rigid_Body *goalLeft = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    Rigid_Body *goalRight = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    goalLeft->warp(Vec3(-3, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
+    goalRight->warp(Vec3(heatgrid_width + 2, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
+
+
+    goals[0] = *goalLeft;
+    goals[1] = *goalRight;
 }
 
 void OpenProjectSimulator::setupPlayerPlatforms()
@@ -527,7 +545,7 @@ void OpenProjectSimulator::update_game(float dt) {
             }
 
             temp_positions[i]  = masspoint.position + dt_2 * masspoint.velocity;
-            temp_velocities[i] = masspoint.velocity + Vec3(0, -dt_2 * this->gravity, 0);
+            temp_velocities[i] = masspoint.velocity;
         }
 
         //
@@ -568,7 +586,6 @@ void OpenProjectSimulator::update_game(float dt) {
             Masspoint & masspoint = this->masspoints[i];
 
             masspoint.position += dt * temp_velocities[i];
-            masspoint.velocity += Vec3(0, -dt * this->gravity, 0);
         }
 
         //
@@ -726,7 +743,6 @@ void OpenProjectSimulator::update_game(float dt) {
     	    if(body.inverse_mass == 0) continue;
             
             // @Incomplete: Add external forces.
-            body.linear_velocity.y += dt * this->gravity; // Add gravity
         }
 
         //
@@ -897,8 +913,7 @@ void OpenProjectSimulator::draw_game() {
             for(int x = 0; x < this->heat_grid.width; ++x) {
                 float value = this->heat_grid.get(x, y);
 
-                float scale = 0.5f;
-                Vec3 position = Vec3(x * scale, y * scale, 0);
+                Vec3 position = Vec3(x * heat_grid.scale, y * heat_grid.scale, 0);
 
                 Vec3 color;
                 if(value >= 0.0)
@@ -906,17 +921,17 @@ void OpenProjectSimulator::draw_game() {
                 else
                     color = lerp(medium_color, cold_color, -value);
 
+                // just for debugging
                 color = Vec3(0, 0, 0);
                 if ((x + y) % 2 == 0){
                     color = Vec3(1,1,1);
                 }
                 this->DUC->setUpLighting(Vec3(0, 0, 0), color, 5, color);
-                //this->DUC->drawSphere(position, scale);
 
                 // Draw Heat map as grid of cubes
                 Mat4 translation_matrix, scale_matrix;
                 translation_matrix.initTranslation(position.x, position.y, position.z);
-                scale_matrix.initScaling(scale, scale, scale);
+                scale_matrix.initScaling(heat_grid.scale, heat_grid.scale, heat_grid.scale);
 
                 Mat4 transformation = scale_matrix * translation_matrix;
                 this->DUC->drawRigidBody(transformation);
