@@ -474,57 +474,32 @@ void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orient
     this->rigid_bodies[index].warp(position, orientation);
 }
 
+void OpenProjectSimulator::setupHeatGrid()
+{
+    heat_grid.create(10, 10);
+    
+}
+
+void OpenProjectSimulator::setupWalls()
+{
+    
+}
+
+void OpenProjectSimulator::setupPlayerPlatforms()
+{
+    
+}
+
+void OpenProjectSimulator::setupBall()
+{
+    
+}
+
 void OpenProjectSimulator::setup_game() {
-    //
-    // Set up the springs.
-    //
-    if(false) {
-        int a = this->create_masspoint(Vec3(0, 0, 0), 10);
-        int b = this->create_masspoint(Vec3(0, 2, 0), 10);
-        this->apply_impulse_to_masspoint(a, Vec3(-1, 0, 0));
-        this->apply_impulse_to_masspoint(b, Vec3( 1, 0, 0));
-        this->create_spring(a, b, 1.f, 40.f);
-    }
-    
-    //
-    // Set up a rigid body.
-    //
-    if(true) {        
-        Rigid_Body & floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0);
-        Rigid_Body & wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body & wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body & wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
-        Rigid_Body & wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
-        
-        wall_north.warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
-        wall_south.warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
-        wall_east .warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
-        wall_west .warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
-
-        // @Cleanup: Seems the order in which rigid bodies are created has an impact on
-        // collision detection (?), or collision resolution, not sure which. I fear the
-        // latter one, since maybe the normal is fucked or something...
-        for(int i = 0; i < 1; ++i) {
-            Rigid_Body & ball       = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
-            ball.warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
-            ball.apply_angular_impulse(Vec3(1, 1, 1));
-        }
-        
-        this->gravity = -10;
-    }
-    
-    //
-    // Set up the heat grid.
-    //
-    if(false) {
-        this->heat_grid.create(16, 16);
-        this->heat_grid.randomize();
-    }
-
-    //
-    // Set up the timing info.
-    //
-    this->time_of_previous_update = get_current_time_in_milliseconds();
+    setupHeatGrid();
+    setupWalls();
+    setupPlayerPlatforms();
+    setupBall();
 }
 
 void OpenProjectSimulator::update_game(float dt) {
@@ -533,7 +508,8 @@ void OpenProjectSimulator::update_game(float dt) {
     // Update the mass-spring-system using the Midpoint method.
     // @Incomplete: Add external forces to each masspoint.
     //
-    {
+    {
+
         Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
         Vec3 temp_velocities[MAX_MASSPOINTS]; // v(t + h/2)
         float dt_2 = 0.5f * dt;
@@ -589,7 +565,8 @@ void OpenProjectSimulator::update_game(float dt) {
         //
 
         for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
+            Masspoint & masspoint = this->masspoints[i];
+
             masspoint.position += dt * temp_velocities[i];
             masspoint.velocity += Vec3(0, -dt * this->gravity, 0);
         }
@@ -912,24 +889,16 @@ void OpenProjectSimulator::draw_game() {
     // Draw the heat grid if requested.
     //
     if(this->draw_requests & DRAW_HEAT_MAP) {
-        float dominating_grid_size = (this->heat_grid.width > this->heat_grid.height) ? this->heat_grid.width : this->heat_grid.height;
-
-        float visual_grid_width = 1, visual_grid_height = 1; // In world space.
-        float visual_sphere_radius = 2 * (visual_grid_width / dominating_grid_size); // Calculated so that the spheres are always twice the "perfect" radius. "Perfect" meaning the spheres would just barely touch each other.
-        float visual_grid_offset_x = -visual_grid_width / 2 + visual_sphere_radius / 2, visual_grid_offset_y = -visual_grid_height / 2 + visual_sphere_radius / 2;
-
         Vec3 medium_color = Vec3(0, 0, 0);
         Vec3 cold_color   = Vec3(.8, .2, .2);
         Vec3 hot_color    = Vec3(1, 1, 1);
 
         for(int y = 0; y < this->heat_grid.height; ++y) {
             for(int x = 0; x < this->heat_grid.width; ++x) {
-                float visual_x = (x / (float) this->heat_grid.width)  * visual_grid_width  + visual_grid_offset_x;
-                float visual_y = (y / (float) this->heat_grid.height) * visual_grid_height + visual_grid_offset_y;
                 float value = this->heat_grid.get(x, y);
 
-                Vec3 position = Vec3(visual_x, visual_y, 0);
-                Vec3 scale    = Vec3(visual_sphere_radius, visual_sphere_radius, visual_sphere_radius);
+                float scale = 0.5f;
+                Vec3 position = Vec3(x * scale, y * scale, 0);
 
                 Vec3 color;
                 if(value >= 0.0)
@@ -937,8 +906,20 @@ void OpenProjectSimulator::draw_game() {
                 else
                     color = lerp(medium_color, cold_color, -value);
 
+                color = Vec3(0, 0, 0);
+                if ((x + y) % 2 == 0){
+                    color = Vec3(1,1,1);
+                }
                 this->DUC->setUpLighting(Vec3(0, 0, 0), color, 5, color);
-                this->DUC->drawSphere(position, scale);
+                //this->DUC->drawSphere(position, scale);
+
+                // Draw Heat map as grid of cubes
+                Mat4 translation_matrix, scale_matrix;
+                translation_matrix.initTranslation(position.x, position.y, position.z);
+                scale_matrix.initScaling(scale, scale, scale);
+
+                Mat4 transformation = scale_matrix * translation_matrix;
+                this->DUC->drawRigidBody(transformation);
             }
         }
     }

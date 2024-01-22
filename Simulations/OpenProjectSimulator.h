@@ -157,6 +157,10 @@ public:
 	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
 	void setup_game();
+	void setupHeatGrid();
+	void setupWalls();
+	void setupPlayerPlatforms();
+	void setupBall();
 	void update_game(float dt);
 	void draw_game();
 
