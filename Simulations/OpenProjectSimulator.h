@@ -4,7 +4,7 @@
 
 #define SIMULATOR_UPDATES_PER_SECOND 100
 #define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
-#define USE_FIXED_DT false // :TimeStep
+#define USE_FIXED_DT true // :TimeStep
 
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
@@ -65,22 +65,19 @@ struct Rigid_Body {
 	Vec3 center_of_mass;
 	Quat orientation;
 	Vec3 size;
-
-	Vec3 force;
-	Vec3 linear_impulse;
-    Vec3 linear_velocity;
-	
-	Vec3 torque;
-	Vec3 angular_impulse;
-	Vec3 angular_velocity;
-	Vec3 angular_momentum;
 	
 	Mat4 transformation;
 	Mat3 inverse_inertia;
-
-	Real inverse_mass;
 	Mat3 inverse_I0;
-
+	Real inverse_mass;
+	
+	Vec3 frame_force;
+	Vec3 linear_velocity;
+	
+	Vec3 frame_torque;
+	Vec3 angular_velocity; 
+	Vec3 angular_momentum;
+	
 	Vec3 albedo;
 
 	void create(Vec3 size, Real mass);
@@ -94,6 +91,12 @@ struct Rigid_Body {
     void apply_torque(Vec3 torque);
     
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
+};
+
+struct Player_Racket
+{
+	Rigid_Body* platform;
+	Spring* spring;
 };
 
 //
@@ -159,11 +162,13 @@ public:
     void apply_torque_to_rigid_body(int index, Vec3 torque);
 	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
-	void setup_game();
+	void setup_demo_scene(); // Fuck you dennis.
 	void setupHeatGrid();
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
+	
+	void setup_game();
 	void update_game(float dt);
 	void draw_game();
 
@@ -209,6 +214,8 @@ private:
 	Rigid_Body normal_walls[2];
 
 	Rigid_Body goals[2];
+
+	Player_Racket player_rackets[2];
 	//
 	// Heat Diffusion.
 	//
