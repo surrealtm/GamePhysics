@@ -444,12 +444,12 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass) {
     return index;
 }
 
-Rigid_Body & OpenProjectSimulator::query_rigid_body(int index) {
+Rigid_Body& OpenProjectSimulator::query_rigid_body(int index) {
     assert(index >= 0 && index < this->rigid_body_count);
     return this->rigid_bodies[index];
 }
 
-Rigid_Body & OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
+Rigid_Body& OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
     return this->query_rigid_body(this->create_rigid_body(size, mass));
 }
 
@@ -531,7 +531,9 @@ void OpenProjectSimulator::setupPlayerPlatforms()
 
 void OpenProjectSimulator::setupBall()
 {
-    
+    ballIndex = OpenProjectSimulator::create_rigid_body(Vec3(0.5f, 0.5f, 0.5f), 1.0f);
+    ball = OpenProjectSimulator::query_rigid_body(ballIndex);
+
 }
 
 void OpenProjectSimulator::setup_game() {
@@ -548,6 +550,8 @@ void OpenProjectSimulator::update_game(float dt) {
     // @Incomplete: Add external forces to each masspoint.
     //
     {
+        std::cout << OpenProjectSimulator::ball.center_of_mass << std::endl;
+        std::cout << OpenProjectSimulator::query_rigid_body(ballIndex).center_of_mass << std::endl;
 
         Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
         Vec3 temp_velocities[MAX_MASSPOINTS]; // v(t + h/2)
