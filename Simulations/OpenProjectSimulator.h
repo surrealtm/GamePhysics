@@ -208,4 +208,7 @@ private:
 	//
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
+
+	Rigid_Body ball;
+	int ballIndex;
 };
