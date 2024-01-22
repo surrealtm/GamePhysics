@@ -94,6 +94,12 @@ struct Rigid_Body {
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
 };
 
+struct Player_Racket
+{
+	Rigid_Body* platform;
+	Spring* spring;
+};
+
 //
 // Heat Diffusion
 //
@@ -207,6 +213,8 @@ private:
 	Rigid_Body normal_walls[2];
 
 	Rigid_Body goals[2];
+
+	Player_Racket player_rackets[2];
 	//
 	// Heat Diffusion.
 	//

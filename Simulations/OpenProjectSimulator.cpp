@@ -505,7 +505,28 @@ void OpenProjectSimulator::setupWalls()
 
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
+    float heightPos = heat_grid.height * heat_grid.scale / 2;
+    // Player 1
+    Player_Racket p = Player_Racket();
+
+    p.platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+    p.platform->warp(Vec3(0, heightPos, 0), Quat(0, 0, 0, 1));
     
+    int m1 = create_masspoint(normal_walls[0].center_of_mass, 1);
+    int m2 = create_masspoint(p.platform->center_of_mass, 1);
+    p.spring = springs + create_spring(m1, m2, 1, 1);
+    player_rackets[0] = p;
+    
+    // Player 2
+    p = Player_Racket();
+
+    p.platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+    p.platform->warp(Vec3(heat_grid.width - 1, heightPos, 0), Quat(0, 0, 0, 1));
+    
+    m1 = create_masspoint(normal_walls[1].center_of_mass, 1);
+    m2 = create_masspoint(p.platform->center_of_mass, 1);
+    p.spring = springs + create_spring(m1, m2, 1, 1);
+    player_rackets[1] = p;
 }
 
 void OpenProjectSimulator::setupBall()
