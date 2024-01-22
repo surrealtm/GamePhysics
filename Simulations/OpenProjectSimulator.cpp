@@ -130,7 +130,7 @@ Quat quat_mul_quat(Quat p, Quat q) {
     Quat result;
     result.x = p.w * q.x + q.w * p.x + u_cross_v.x;
     result.y = p.w * q.y + q.w * p.y + u_cross_v.y;
-    result.y = p.w * q.z + q.w * p.z + u_cross_v.z;
+    result.z = p.w * q.z + q.w * p.z + u_cross_v.z;
     result.w = p.w * q.w - u_dot_v;
     return result;
 }
@@ -194,10 +194,15 @@ void Rigid_Body::create(Vec3 size, Real mass) {
 	this->inverse_mass = mass > 0.0 ? 1.0 / mass : 0.0;
 
 	if(mass > 0) {
-        Real a = size.x * size.x, b = size.y * size.y, c = size.z * size.z;
-		this->inverse_I0 = { (12.0 * mass) * (b + c), 0, 0,
-					         0, (12.0 * mass) * (a + c), 0 ,
-				             0, 0, (12.0 * mass) * (a + b) };
+        // Copied from https://github.com/bulletphysics/bullet3/blob/master/src/BulletCollision/CollisionShapes/btBoxShape.cpp
+        Real lx = this->size.x, ly = this->size.y, lz = this->size.z; // The size vector is already in full extends.
+        Vec3 inertia = { mass / 12.0 * (ly * ly + lz * lz),
+                         mass / 12.0 * (lx * lx + lz * lz),
+                         mass / 12.0 * (lx * lx + ly * ly) };
+        
+		this->inverse_I0 = { 1.0 / inertia.x, 0, 0,
+					         0, 1.0 / inertia.y, 0 ,
+				             0, 0, 1.0 / inertia.z };
 	} else {
 		this->inverse_I0 = { 1, 0, 0,
 					         0, 1, 0 ,
@@ -218,7 +223,7 @@ void Rigid_Body::warp(Vec3 center, Quat orientation) {
     this->torque           = Vec3(0, 0, 0);
     this->angular_impulse  = Vec3(0, 0, 0);
     this->angular_velocity = Vec3(0, 0, 0);
-	this->angular_momentum = Vec3(0, 10, 0); // nocheckin
+	this->angular_momentum = Vec3(0, 0, 0);
 
     this->build_inertia_tensor();
 	this->build_transformation_matrix();
@@ -234,9 +239,10 @@ void Rigid_Body::build_transformation_matrix() {
 }
 
 void Rigid_Body::build_inertia_tensor() {
+    // Copied from https://github.com/bulletphysics/bullet3/blob/master/src/BulletDynamics/Dynamics/btRigidBody.cpp
     Mat3 rotation_matrix = mat3_from_quaternion(this->orientation);
-    Mat3 inverse_rotation_matrix = mat3_tranpose(rotation_matrix);
-    this->inverse_inertia = mat3_mul_mat3(mat3_mul_mat3(inverse_rotation_matrix, this->inverse_I0), rotation_matrix);
+    Mat3 transposed_rotation_matrix = mat3_tranpose(rotation_matrix);
+    this->inverse_inertia = mat3_mul_mat3(mat3_mul_mat3(rotation_matrix, this->inverse_I0), transposed_rotation_matrix);
 }
 
 void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
@@ -260,7 +266,7 @@ void Rigid_Body::apply_torque(Vec3 torque) {
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
-	return this->linear_velocity + cross(this->angular_velocity, position_relative_to_center);
+	return this->linear_velocity + cross(position_relative_to_center, this->angular_velocity);
 }
 
 
@@ -473,21 +479,10 @@ void OpenProjectSimulator::setup_game() {
     // Set up a rigid body.
     //
     if(true) {
-#if true
-        // This is the demo scene from the second exercise.
-        //int a = this->create_rigid_body(Vec3(1, 0.6, 0.5), 2);
-        //int b = this->create_rigid_body(Vec3(1, 0.6, 0.5), 2);
         int a = this->create_rigid_body(Vec3(1, 1, 1), 1);
         int b = this->create_rigid_body(Vec3(1, 1, 1), 0);
-        this->warp_rigid_body(a, Vec3(0, 1.5, 0), Quat(0, 0, 0, 1));
-        this->gravity = 0;
-#elif true
-        // This drops a cube down onto a solid floor
-        int a = this->create_rigid_body(Vec3(1, 1, 1), 1);
-        int b = this->create_rigid_body(Vec3(2, 1, 2), 0);
-        this->warp_rigid_body(a, Vec3(0, 5, 0), quat_from_euler_angles(.125, 0, 0));
-        this->apply_torque_to_rigid_body(a, Vec3(1, 0, 0));
-#endif
+        this->warp_rigid_body(a, Vec3(.5, 1.5, 0), quat_from_euler_angles(0, 0, 0));
+        this->gravity = -1;
     }
     
     //
@@ -749,8 +744,8 @@ void OpenProjectSimulator::update_game(float dt) {
                 
                 // @@Debug
                 this->contact_points_to_draw_count = result.world_space_position_count;
-                memcpy(this->contact_points_to_draw, result.world_space_positions, sizeof(this->contact_points_to_draw));
-                
+                memcpy(&this->contact_points_to_draw[0], &result.world_space_positions[0], sizeof(this->contact_points_to_draw));
+
                 Real point_factor = 1.0 / (Real) result.world_space_position_count;
                 Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
                 
@@ -776,8 +771,8 @@ void OpenProjectSimulator::update_game(float dt) {
                     Vec3 collision_point_on_lhs = contact_point - lhs.center_of_mass; // xa
                     Vec3 collision_point_on_rhs = contact_point - rhs.center_of_mass; // xb
 
-                    Vec3 collision_point_on_lhs_cross_normal = cross(contact_normal, collision_point_on_lhs);
-                    Vec3 collision_point_on_rhs_cross_normal = cross(contact_normal, collision_point_on_rhs);
+                    Vec3 collision_point_on_lhs_cross_normal = cross(collision_point_on_lhs, contact_normal);
+                    Vec3 collision_point_on_rhs_cross_normal = cross(collision_point_on_rhs, contact_normal);
 
                     Vec3 applied_inerta_on_lhs = cross(mat3_mul_vec3(lhs.inverse_inertia, collision_point_on_lhs_cross_normal), collision_point_on_lhs);
                     Vec3 applied_inerta_on_rhs = cross(mat3_mul_vec3(rhs.inverse_inertia, collision_point_on_rhs_cross_normal), collision_point_on_rhs);
@@ -798,6 +793,7 @@ void OpenProjectSimulator::update_game(float dt) {
 
                     printf("=== Collision ===\n");
                     printf("  > World Space Contact: %f, %f, %f\n", contact_point.x, contact_point.y, contact_point.z);
+                    printf("  > Relative Velocity: %f, %f, %f\n", relative_velocity.x, relative_velocity.y, relative_velocity.z);
                     printf("  > Applying impulse: %f, %f, %f\n", impulse.x, impulse.y, impulse.z);
                     printf("  > LHS Angular Impulse: %f, %f, %f\n", lhs.angular_impulse.x, lhs.angular_impulse.y, lhs.angular_impulse.z);
                     printf("  > RHS Angular Impulse: %f, %f, %f\n", rhs.angular_impulse.x, rhs.angular_impulse.y, rhs.angular_impulse.z);
@@ -818,9 +814,9 @@ void OpenProjectSimulator::update_game(float dt) {
             // Integrate the linear part using Euler.
             //
 
-            body.linear_velocity  += body.linear_impulse * body.inverse_mass; // Impulse needs to have a direct impact on the linear velocity without integration. It is only a seperate variable since we are resolving multiple contact points at once, in which case modifying the linear velocity in the resolution loop would manipulate how these contact points are resolved, which we don't want... This also solves the issue where resting bodies would glitch through each other, since gravity is not cancelled out in time by the impulse before being added to the position.
-            body.center_of_mass    = body.center_of_mass  + body.linear_velocity * dt;
-            body.linear_velocity   = body.linear_velocity + body.force * body.inverse_mass * dt;
+            body.linear_velocity  += body.linear_impulse  * body.inverse_mass; // Impulse needs to have a direct impact on the linear velocity without integration. It is only a seperate variable since we are resolving multiple contact points at once, in which case modifying the linear velocity in the resolution loop would manipulate how these contact points are resolved, which we don't want... This also solves the issue where resting bodies would glitch through each other, since gravity is not cancelled out in time by the impulse before being added to the position.
+            body.center_of_mass    = body.center_of_mass  + body.linear_velocity * dt; // Integrate the position
+            body.linear_velocity   = body.linear_velocity + body.force * body.inverse_mass * dt; // Integrate the velocity.
 
             // Reset the accumulators every frame.
             body.force             = { 0 };
@@ -830,8 +826,9 @@ void OpenProjectSimulator::update_game(float dt) {
             // Integrate the angular part.
             //
 
+            body.angular_momentum += body.angular_impulse; // See the linear impulse.
+            
             // Integrate the rotation
-            body.angular_momentum += body.angular_impulse;
             body.orientation = body.orientation + dt_2 * quat_mul_quat(Quat(body.angular_velocity.x, body.angular_velocity.y, body.angular_velocity.z, 0), body.orientation);
             body.orientation = body.orientation.unit();
 
@@ -856,7 +853,7 @@ void OpenProjectSimulator::update_game(float dt) {
         }
     }
 
-    this->debug_print();
+    //this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {
@@ -992,7 +989,8 @@ void OpenProjectSimulator::debug_print() {
             printf("    %u > Position = " PRINT_FIXED_VEC3 ", Linear Velocity = " PRINT_FIXED_VEC3 ", Angular Momentum = " PRINT_FIXED_VEC3 "\n",
                 i, body.center_of_mass.x, body.center_of_mass.y, body.center_of_mass.z, body.linear_velocity.x, body.linear_velocity.y, body.linear_velocity.z,
                 body.angular_momentum.x, body.angular_momentum.y, body.angular_momentum.z);
-            printf("         Orientation = { %f, %f, %f, %f }\n", body.orientation.x, body.orientation.y, body.orientation.z, body.orientation.w);
+            printf("         Orientation = { %f, %f, %f, %f }, Angular Velocity = " PRINT_FIXED_VEC3 "\n", 
+                body.orientation.x, body.orientation.y, body.orientation.z, body.orientation.w, body.angular_velocity.x, body.angular_velocity.y, body.angular_velocity.z);
         }
     }
 

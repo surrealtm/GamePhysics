@@ -33,7 +33,7 @@ SAT_Scalar sat_dot(SAT_Vec3 lhs, SAT_Vec3 rhs) {
 
 SAT_Vec3 sat_normalized_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
     SAT_Vec3 result;
-    result.x = lhs.y * rhs.z - lhs.z - rhs.y;
+    result.x = lhs.y * rhs.z - lhs.z * rhs.y;
     result.y = lhs.z * rhs.x - lhs.x * rhs.z;
     result.z = lhs.x * rhs.y - lhs.y * rhs.x;
 
@@ -131,7 +131,7 @@ bool __sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
 }
 
 void __sat_find_significant_face(SAT_State *state, SAT_Significant_Face face_index, SAT_Vec3 face_normal, SAT_Vec3 scaled_normal, SAT_Vec3 scaled_u, SAT_Vec3 scaled_v, SAT_Vec3 center) {
-    SAT_Vec3 signed_normal = (face_index == SAT_SIGNIFICANT_FACE_reference) ? sat_negate(state->collision_normal) : state->collision_normal; // The reference face should point the exact opposite way.
+    SAT_Vec3 signed_normal = (face_index == SAT_SIGNIFICANT_FACE_incident) ? sat_negate(state->collision_normal) : state->collision_normal; // The reference face should point the exact opposite way.
 
     SAT_Scalar dot = sat_dot(face_normal, signed_normal);
     if(dot > state->significant_face[face_index].face_normal_dot_collision_normal) {
@@ -242,14 +242,16 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
     }
         
     // Check the remaining edge-to-edge axis.
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Y]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_X], state.unit_axis[SAT_B][SAT_AXIS_Z]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_Z]));
+    /* nocheckin
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Y]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_X], state.unit_axis[SAT_A][SAT_AXIS_Z]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_Z]));
 
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Y], state.unit_axis[SAT_B][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_X]));
-    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_A][SAT_AXIS_Z], state.unit_axis[SAT_B][SAT_AXIS_Y]));
-    
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Y], state.unit_axis[SAT_A][SAT_AXIS_X]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_X]));
+    state.found_separating_axis |= __sat_is_separating_axis(&state, sat_normalized_cross(state.unit_axis[SAT_B][SAT_AXIS_Z], state.unit_axis[SAT_A][SAT_AXIS_Y]));
+    */
+
     //
     // If we have not found a separating axis, it means that there is a collision.
     // Fill in the collision data.
@@ -341,7 +343,7 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         
         result.found_collision = true;
         result.depth  = state.penetration_depth;
-        result.normal = sat_negate(state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal);
+        result.normal = state.significant_face[SAT_SIGNIFICANT_FACE_reference].face_normal;
         
 #if false
         result.world_space_position_count = 4; // @Incomplete: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.

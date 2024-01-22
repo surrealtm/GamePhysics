@@ -4,7 +4,7 @@
 
 #define SIMULATOR_UPDATES_PER_SECOND 100
 #define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
-#define USE_FIXED_DT true // :TimeStep
+#define USE_FIXED_DT false // :TimeStep
 
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
