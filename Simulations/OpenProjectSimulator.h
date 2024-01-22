@@ -10,6 +10,8 @@
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
+#define OFFSET_HEAT_GRID -0.75f // Offset to heat grid for walls, ball, player rackets
+
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
 
@@ -213,6 +215,11 @@ private:
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
 
-	Rigid_Body ball;
+	Rigid_Body* ball;
 	int ballIndex;
+
+	bool random(int rng) {
+		return (std::uniform_int_distribution<int>{}(rng)) & 1;
+	}
+
 };

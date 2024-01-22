@@ -505,14 +505,20 @@ void OpenProjectSimulator::setupWalls()
 
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
-    
+   
 }
 
 void OpenProjectSimulator::setupBall()
 {
-    ballIndex = OpenProjectSimulator::create_rigid_body(Vec3(0.5f, 0.5f, 0.5f), 1.0f);
-    ball = OpenProjectSimulator::query_rigid_body(ballIndex);
+    float heatgrid_width = heat_grid.width * heat_grid.scale;
+    float heatgrid_height = heat_grid.height * heat_grid.scale;
+    float ballScale = 0.5f;
+    float ballMass = 1.0f;
 
+    ball = rigid_bodies + create_rigid_body(Vec3(ballScale), ballMass);
+    ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, -0.75), Quat(0, 0, 0, 1));
+    ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
+    
 }
 
 void OpenProjectSimulator::setup_game() {
@@ -529,8 +535,7 @@ void OpenProjectSimulator::update_game(float dt) {
     // @Incomplete: Add external forces to each masspoint.
     //
     {
-        std::cout << OpenProjectSimulator::ball.center_of_mass << std::endl;
-        std::cout << OpenProjectSimulator::query_rigid_body(ballIndex).center_of_mass << std::endl;
+       std::cout << ball->center_of_mass << std::endl;
 
         Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
         Vec3 temp_velocities[MAX_MASSPOINTS]; // v(t + h/2)
