@@ -167,11 +167,12 @@ SAT_Input sat_input(Rigid_Body & body) {
 // Rigid Bodies.
 //
 
-void Rigid_Body::create(Vec3 size, Real mass, bool is_trigger) {
+void Rigid_Body::create(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(mass >= 0.f && "Invalid Mass for Rigid Body.");
 
 	this->size           = size;
 	this->inverse_mass   = mass > 0.0 ? 1.0 / mass : 0.0;
+    this->restitution    = restitution;
     this->is_trigger     = is_trigger;
     this->linear_factor  = Vec3(1, 1, 1);
     this->angular_factor = Vec3(1, 1, 1);
@@ -326,7 +327,14 @@ float Heat_Grid::get(int x, int y) {
 // Simulator
 //
 
+void TW_CALL tw_reset_button_callback(void *user_pointer) {
+    OpenProjectSimulator * sim = (OpenProjectSimulator *) user_pointer;
+    sim->reset();
+}
+
+
 OpenProjectSimulator::OpenProjectSimulator() {
+    this->DUC = NULL;
     setup_timing();
 }
 
@@ -335,12 +343,24 @@ const char * OpenProjectSimulator::getTestCasesStr() {
 }
 
 void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
-    // @Incomplete: Maybe add a gravity, spring_damping, heat_alpha UI.
     this->DUC = DUC;
+
+    TwDeleteBar(this->DUC->g_pTweakBar); // We don't want any of the default stuff, since that does not apply for the open project...
+    this->tweak_bar = TwNewBar("OpenProject");
+
+    TwType TW_TYPE_DRAW_REQUESTS = TwDefineEnumFromString("DrawRequests", "Springs,HeatMap,RigidBodies,Everything");
+    TwAddButton(this->tweak_bar, "Reset", [](void * data){ tw_reset_button_callback(data); }, this, "");
+    TwAddVarRW(this->tweak_bar, "Running", TW_TYPE_BOOLCPP, &this->running, "");
+	TwAddVarRW(this->tweak_bar, "DrawRequests", TW_TYPE_DRAW_REQUESTS, &this->draw_requests, "");
+    TwAddVarRW(this->tweak_bar, "Time Factor", TW_TYPE_DOUBLE, &this->time_factor, "min=0.001 max=10 step=0.1");
+
+    this->set_default_camera_position();
 }
 
 void OpenProjectSimulator::reset() {
     this->draw_requests = DRAW_EVERYTHING;
+    this->running       = true;
+    this->time_factor   = 1.0;
 
     this->masspoint_count = 0;
     this->spring_count    = 0;
@@ -350,6 +370,7 @@ void OpenProjectSimulator::reset() {
     
     this->heat_alpha = 0.5f; // Half decay.
     
+    this->set_default_camera_position();
     this->setup_game();    
 }
 
@@ -363,6 +384,11 @@ void OpenProjectSimulator::notifyCaseChanged(int testCase) {
 } 
 
 void OpenProjectSimulator::simulateTimestep(float timestep) {
+    if(!this->running) {
+        this->time_of_previous_update = get_current_time_in_milliseconds();
+        return;
+    }
+    
     //
     // :TimeStep
     //
@@ -370,7 +396,7 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
     double now = get_current_time_in_milliseconds();
 
     while(now - this->time_of_previous_update > FIXED_DT) {
-        this->update_game(FIXED_DT);
+        this->update_game(FIXED_DT * this->time_factor);
         this->time_of_previous_update += FIXED_DT;
     }
 #else
@@ -415,12 +441,12 @@ int OpenProjectSimulator::create_spring(int a, int b, Real initial_length, Real 
     return index;
 }
 
-int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, bool is_trigger) {
+int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(this->rigid_body_count < MAX_RIGID_BODIES);
     int index = this->rigid_body_count;
 
     Rigid_Body & body = this->rigid_bodies[index];
-    body.create(size, mass, is_trigger);
+    body.create(size, mass, restitution, is_trigger);
     body.albedo = Vec3(random_float(0, 1), random_float(0, 1), random_float(0, 1));
     
     ++this->rigid_body_count;
@@ -455,8 +481,8 @@ Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
     return &this->rigid_bodies[index];
 }
 
-Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
-    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass, restitution, is_trigger));
 }
 
 Spring * OpenProjectSimulator::query_spring(int index) {
@@ -493,11 +519,11 @@ void OpenProjectSimulator::setup_demo_scene() {
     // Set up a rigid body.
     //
     if(true) {        
-        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0, false);
-        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, false);
-        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, false);
-        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, false);
-        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, false);
+        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4),  0, 1, false);
+        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, 1, false);
+        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, 1, false);
+        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, 1, false);
+        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, 1, false);
         
         wall_north->warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
         wall_south->warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
@@ -505,7 +531,7 @@ void OpenProjectSimulator::setup_demo_scene() {
         wall_west ->warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
 
         for(int i = 0; i < 10; ++i) {
-            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1, false);
+            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1, 1, false);
             ball->warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
             ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
@@ -533,8 +559,8 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, false);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, false);
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 1, false);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 1, false);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -542,8 +568,8 @@ void OpenProjectSimulator::setupWalls()
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, false);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, false);
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -593,6 +619,15 @@ void OpenProjectSimulator::setupBall()
     this->ball->set_angular_factor(Vec3(1, 1, 0));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
+}
+
+void OpenProjectSimulator::set_default_camera_position() {
+    if(this->DUC) {
+        const float lookat_size = 16.0f;
+        
+        this->DUC->g_camera.Reset();
+        this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+    }
 }
 
 void OpenProjectSimulator::setup_game() {
@@ -934,7 +969,7 @@ void OpenProjectSimulator::update_game(float dt) {
                     // and applying the respective part to each of them.
                     //
 
-                    const Real restitution = 1;
+                    const Real restitution = min(lhs.restitution, rhs.restitution);
 
                     Vec3 collision_point_on_lhs = contact_point - lhs.center_of_mass; // xa
                     Vec3 collision_point_on_rhs = contact_point - rhs.center_of_mass; // xb
@@ -1018,7 +1053,7 @@ void OpenProjectSimulator::draw_game() {
     //
     // Draw all masspoints and springs if requested.
     //
-    if(this->draw_requests & DRAW_SPRINGS) {
+    if(this->draw_requests == DRAW_SPRINGS || this->draw_requests == DRAW_EVERYTHING) {
         const float sphere_radius = 0.1f;
 
         for(int i = 0; i < this->masspoint_count; ++i) {
@@ -1050,7 +1085,7 @@ void OpenProjectSimulator::draw_game() {
     //
     // Draw the heat grid if requested.
     //
-    if(this->draw_requests & DRAW_HEAT_MAP) {
+    if(this->draw_requests == DRAW_HEAT_MAP || this->draw_requests == DRAW_EVERYTHING) {
         Vec3 medium_color = Vec3(0, 0, 0);
         Vec3 cold_color   = Vec3(.8, .2, .2);
         Vec3 hot_color    = Vec3(1, 1, 1);
@@ -1079,7 +1114,7 @@ void OpenProjectSimulator::draw_game() {
                 translation_matrix.initTranslation(position.x, position.y, position.z);
                 scale_matrix.initScaling(heat_grid.scale, heat_grid.scale, heat_grid.scale);
 
-                Mat4 transformation = scale_matrix * translation_matrix;
+                Mat4 transformation = scale_matrix * translation_matrix * this->DUC->g_camera.GetWorldMatrix();
                 this->DUC->drawRigidBody(transformation);
             }
         }
@@ -1088,11 +1123,11 @@ void OpenProjectSimulator::draw_game() {
     //
     // Draw all rigid bodies if requested.
     //
-    if(this->draw_requests & DRAW_RIGID_BODIES) {
+    if(this->draw_requests == DRAW_RIGID_BODIES || this->draw_requests == DRAW_EVERYTHING) {
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
             this->DUC->setUpLighting(Vec3(0, 0, 0), body.albedo, 0.2, body.albedo);
-            this->DUC->drawRigidBody(body.transformation);
+            this->DUC->drawRigidBody(body.transformation * this->DUC->g_camera.GetWorldMatrix());
         }
     }
 }

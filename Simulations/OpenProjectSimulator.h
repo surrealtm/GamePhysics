@@ -74,7 +74,7 @@ struct Rigid_Body {
 	
 	Vec3 frame_force;
 	Vec3 linear_velocity;
-	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis.
+	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis. @Cleanup: This does not seem to work apparently?
 
 	Vec3 frame_torque;
 	Vec3 angular_velocity; 
@@ -83,9 +83,10 @@ struct Rigid_Body {
 	
 	Vec3 albedo;
 
+    Real restitution;
 	bool is_trigger;
 
-	void create(Vec3 size, Real mass, bool is_trigger);
+	void create(Vec3 size, Real mass, Real restitution, bool is_trigger);
 	void warp(Vec3 center, Quat orientation);
 	void build_transformation_matrix();
     void build_inertia_tensor();
@@ -137,12 +138,16 @@ struct Heat_Grid {
 // Simulator
 //
 
-enum DrawRequest { // We may wish to draw certain things for debugging, but not for the final experience, e.g. the spring connections...
-	DRAW_NOTHING      = 0x0,
-	DRAW_SPRINGS      = 0x1,
+// We may wish to draw certain things for debugging, but not for the final experience, 
+// e.g. the spring connections...
+// Unfortunately the tweak bar UI works with indices, not enum values, so we cannot
+// use cool bit-fiddeling here, and instead must do it like the poor peasants C++
+// programmers are sometimes... Sadge.
+enum DrawRequest {
+	DRAW_SPRINGS      = 0x0,
+	DRAW_HEAT_MAP     = 0x1,
 	DRAW_RIGID_BODIES = 0x2,
-	DRAW_HEAT_MAP     = 0x4,
-	DRAW_EVERYTHING   = DRAW_SPRINGS | DRAW_RIGID_BODIES | DRAW_HEAT_MAP,
+	DRAW_EVERYTHING   = 0x3,
 };
 
 class OpenProjectSimulator : public Simulator {
@@ -171,7 +176,7 @@ public:
 
 	int create_masspoint(Vec3 position, Real mass);
 	int create_spring(int a, int b, Real initial_length, Real stiffness);
-	int create_rigid_body(Vec3 size, Real mass, bool is_trigger);
+	int create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
@@ -184,6 +189,7 @@ public:
 	void setupPlayerPlatforms();
 	void setupBall();
 	
+	void set_default_camera_position();
 	void setup_game();
 	void game_logic(float dt);
 	void update_game(float dt);
@@ -193,7 +199,7 @@ public:
 
 private:
     Rigid_Body * query_rigid_body(int index);
-    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger);
+    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
@@ -211,10 +217,13 @@ private:
 	// updates per second, with the appropriate delta for these updates.
 	//
 	double time_of_previous_update;
+	double time_factor;
+	bool running; // The UI can toggle this for debugging purposes. The game loop will not be executed when this is false.
 
 	//
 	// General stuff.
 	//
+	TwBar *tweak_bar;
 	DrawRequest draw_requests;
 	float gravity;
 
