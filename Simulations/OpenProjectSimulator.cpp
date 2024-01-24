@@ -674,17 +674,68 @@ void OpenProjectSimulator::game_logic(float dt) {
 
     if(DXUTIsKeyDown(VK_UP))
     {
-        this->player_rackets[1].platform->apply_impulse(player_rackets[1].platform->center_of_mass, Vec3(0, .1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, 1.5, 0));
+        
     }else if(DXUTIsKeyDown(VK_DOWN))
     {
-        this->player_rackets[1].platform->apply_impulse(player_rackets[1].platform->center_of_mass, Vec3(0, -.1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, -1.5, 0));
+    }else
+    {
+        
+        if(this->player_rackets[1].platform->linear_velocity.y > -0.05 && this->player_rackets[1].platform->linear_velocity.y < 0.05)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity.y -= 0.03;
+            
+        }else if(this->player_rackets[1].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[1].platform->linear_velocity.y += 0.03;
+           
+        }
+        
     }
     if(DXUTIsKeyDown(0x57))
     {
-        this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, 0.1, 0));
+        if(this->player_rackets[0].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, 1.5, 0));
     }else if(DXUTIsKeyDown(0x53))
     {
-        this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, -0.1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, -1.5, 0));
+    }else
+    {
+        
+        if(this->player_rackets[0].platform->linear_velocity.y > -0.05 && this->player_rackets[0].platform->linear_velocity.y < 0.05)
+        {
+            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
+        }
+        if(this->player_rackets[0].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
+            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
+        }else if(this->player_rackets[0].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
+            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
+        }
+        
     }
     
     //
