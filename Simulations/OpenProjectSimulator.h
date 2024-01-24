@@ -10,6 +10,10 @@
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
+#define USE_PHYSICS_TEST_SCENE false // nocheckin
+#define RIGID_BODY_POSITION_ERROR_CORRECTION true
+#define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
+
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
 #define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to walls
 
@@ -28,7 +32,6 @@ Mat3 mat3_from_quaternion(Quat & q);
 Mat3 mat3_mul_mat3(Mat3 & lhs, Mat3 & rhs);
 Vec3 mat3_mul_vec3(Mat3 & lhs, Vec3 & rhs);
 Mat3 mat3_tranpose(Mat3 & input);
-Mat3 mat3_inverse(Mat3 & input);
 
 Real turns_to_radians(Real value);
 Quat quat_from_euler_angles(Real x, Real y, Real z);
@@ -73,10 +76,12 @@ struct Rigid_Body {
 	Real inverse_mass;
 	
 	Vec3 frame_force;
+    Vec3 frame_linear_impulse; // Summed together and added once to the velocity, so that first collision in the frame does not manipulate the second one (due to already changing the velocity...)
 	Vec3 linear_velocity;
-	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis. @Cleanup: This does not seem to work apparently?
+	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis.
 
 	Vec3 frame_torque;
+    Vec3 frame_angular_impulse; // See frame_linear_impulse
 	Vec3 angular_velocity; 
 	Vec3 angular_momentum;
 	Vec3 angular_factor; // See linear_factor
@@ -85,6 +90,8 @@ struct Rigid_Body {
 
     Real restitution;
 	bool is_trigger;
+	bool sleeping;
+	float inactive_time;
 
 	void create(Vec3 size, Real mass, Real restitution, bool is_trigger);
 	void warp(Vec3 center, Quat orientation);
@@ -92,12 +99,16 @@ struct Rigid_Body {
     void build_inertia_tensor();
     
 	void apply_force(Vec3 world_space_position, Vec3 force);
-	void apply_impulse(Vec3 world_space_position, Vec3 impulse);
-	void apply_angular_impulse(Vec3 impulse);
-    void apply_torque(Vec3 torque);
-    
+	void apply_torque(Vec3 torque);
+    void apply_impulse(Vec3 world_space_position, Vec3 impulse);
+	
 	void set_linear_factor(Vec3 factor);
 	void set_angular_factor(Vec3 factor);
+
+	void maybe_sleep(float dt);
+	void maybe_awake();
+	void awake();
+	bool inactive();
 
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
 };
@@ -191,8 +202,8 @@ public:
 	
 	void set_default_camera_position();
 	void setup_game();
-	void game_logic(float dt);
-	void update_game(float dt);
+	void update_game_logic(float dt);
+	void update_physics_engine(float dt);
 	void draw_game();
 
 	void debug_print();
@@ -243,6 +254,7 @@ private:
 	int rigid_body_count;
 
 	std::vector<Trigger_Collision> trigger_collisions;
+	std::vector<Vec3> debug_draw_points; // Debug: Can be used to draw anything in immediate mode.
 
 	Rigid_Body * normal_walls[2];
 	Rigid_Body * goals[2];

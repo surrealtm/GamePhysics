@@ -40,28 +40,13 @@ SAT_Vec3 sat_normalized_cross(SAT_Vec3 lhs, SAT_Vec3 rhs) {
 
     SAT_Scalar magnitude = sqrt(result.x * result.x + result.y * result.y + result.z * result.z);
 
-    if(magnitude >= 0.0001) {
+    if(magnitude >= SAT_EPSILON) {
         result.x /= magnitude;
         result.y /= magnitude;
         result.z /= magnitude;
     }
     
     return result;
-}
-
-bool sat_ray_plane_intersection(SAT_Vec3 plane_center, SAT_Vec3 plane_normal, SAT_Vec3 ray_origin, SAT_Vec3 ray_direction, SAT_Vec3 *result) {
-    SAT_Scalar denom = sat_dot(plane_normal, ray_direction);
-    if(sat_abs(denom) <= 0.0001) return false;
-
-    SAT_Vec3 delta = sat_vec3(plane_center.x - ray_origin.x, plane_center.y - ray_origin.y, plane_center.z - ray_origin.z);
-    SAT_Scalar t = sat_dot(delta, plane_normal) / denom;
-
-    if(sat_abs(t) <= 0.0001) return false;
-
-    result->x = ray_origin.x + t * ray_direction.x;
-    result->y = ray_origin.y + t * ray_direction.y;
-    result->z = ray_origin.z + t * ray_direction.z;
-    return true;
 }
 
 SAT_Vec3 sat_rotate(SAT_Quat quat, SAT_Vec3 vec) {
@@ -115,13 +100,34 @@ SAT_Quat sat_quat_from_euler_angles(SAT_Scalar x, SAT_Scalar y, SAT_Scalar z) {
     return result;
 }
 
+bool sat_fuzzy_compare(SAT_Vec3 lhs, SAT_Vec3 rhs) {
+    return sat_abs(lhs.x - rhs.x) < SAT_EPSILON && sat_abs(lhs.y - rhs.y) < SAT_EPSILON && sat_abs(lhs.z - rhs.z) < SAT_EPSILON;
+}
+
+bool sat_ray_plane_intersection(SAT_Vec3 plane_center, SAT_Vec3 plane_normal, SAT_Vec3 ray_origin, SAT_Vec3 ray_direction, SAT_Vec3 *intersection_point, SAT_Scalar *intersection_distance) {
+    SAT_Scalar denom = sat_dot(plane_normal, ray_direction);
+    if(sat_abs(denom) <= SAT_EPSILON) return false;
+
+    SAT_Vec3 delta = sat_vec3(plane_center.x - ray_origin.x, plane_center.y - ray_origin.y, plane_center.z - ray_origin.z);
+    SAT_Scalar t = sat_dot(delta, plane_normal) / denom;
+
+    if(t <= SAT_EPSILON) return false;
+
+    intersection_point->x = ray_origin.x + t * ray_direction.x;
+    intersection_point->y = ray_origin.y + t * ray_direction.y;
+    intersection_point->z = ray_origin.z + t * ray_direction.z;
+    *intersection_distance = t;
+    return true;
+}
+
+
 
 /* =============================== Internal Logic =============================== */
 
 // The collision normal is always supposed to be the face normal of LHS. If we are checking a normal
 // of RHS, then we need to flip that normal around for the result.
 bool sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
-    if(sat_dot(axis, axis) <= 0.00001) return false; // The axis was spawned from a cross product, but the two vectors were parallel, so no valid axis was created.
+    if(sat_dot(axis, axis) <= SAT_EPSILON) return false; // The axis was spawned from a cross product, but the two vectors were parallel, so no valid axis was created.
 
     SAT_Scalar lhs = sat_abs(sat_dot(state->lhs_to_rhs, axis));
     SAT_Scalar rhs = 0;
@@ -139,14 +145,8 @@ bool sat_is_separating_axis(SAT_State *state, SAT_Vec3 axis) {
     // removes collisions with "backfaces", improving the tunneling situation a bit.
     bool is_collision_axis = overlap > 0;
 
-    bool is_better_collision_axis = is_collision_axis;
-
-#if SAT_USE_MINIMAL_TRANSLATION_VECTOR
-    is_better_collision_axis &= overlap < state->penetration_depth;
-#elif SAT_USE_PROJECTED_VELOCITY
-    is_better_collision_axis &= axis_dot_relative_velocity > state->collision_normal_dot_relative_velocity;
-#endif
-
+    bool is_better_collision_axis = is_collision_axis && overlap < state->penetration_depth;
+    
     if(is_better_collision_axis) {
         // We have found our new collision axis.
         state->collision_normal_dot_relative_velocity = axis_dot_relative_velocity;
@@ -216,18 +216,34 @@ SAT_Vec3 sat_clip_point_against_plane(SAT_Vec3 point, SAT_Vec3 edge_direction, S
     // The point is "outside" the plane, clip it onto the plane.
     //
     SAT_Vec3 projected_point;
-    bool valid_intersection = sat_ray_plane_intersection(plane_center, plane_normal, point, edge_direction, &projected_point);
-    if(!valid_intersection) return point; // No clipping possible.
+    SAT_Scalar projected_distance;
+    bool valid_intersection = sat_ray_plane_intersection(plane_center, plane_normal, point, edge_direction, &projected_point, &projected_distance);
+    if(!valid_intersection) return point; // The ray is parallel to the plane, no clipping possible.
+
+    //
+    // Make sure the projected point is still on the edge between the given point,
+    // and the other edge point.
+    // If the line does not actually intersect with the plane, this would fail.
+    // ----\       |
+    //      -------| < This edge of the body only intersects after the other edge point., but others do...
+    // ---------|  \ ***** < Infinite extension of the edge, which would collide...
+    //          |
+    //
+    if(projected_distance * projected_distance > sat_dot(edge_direction, edge_direction)) return point; // The edge does not intersect with the face, no clipping possible.
     
     return projected_point;
 }
 
 void sat_clip_incident_corners_against_plane(SAT_State *state, SAT_Vec3 plane_center, SAT_Vec3 plane_normal) {
     SAT_Vec3 *corners = state->significant_face[SAT_SIGNIFICANT_FACE_incident].corners;
-    SAT_Vec3 u = sat_vec3(corners[1].x - corners[0].x, corners[1].y - corners[0].y, corners[1].z - corners[0].z);
-    SAT_Vec3 v = sat_vec3(corners[3].x - corners[0].x, corners[3].y - corners[0].y, corners[3].z - corners[0].z);
     
     for(int i = 0; i < 4; ++i) {
+        int i1 = (i + 1) % 4;
+        int i3 = (i + 3) % 4;
+        
+        SAT_Vec3 u = sat_vec3(corners[i1].x - corners[i].x, corners[i1].y - corners[i].y, corners[i1].z - corners[i].z);
+        SAT_Vec3 v = sat_vec3(corners[i3].x - corners[i].x, corners[i3].y - corners[i].y, corners[i3].z - corners[i].z);
+        
         corners[i] = sat_clip_point_against_plane(corners[i], u, plane_center, plane_normal);
         corners[i] = sat_clip_point_against_plane(corners[i], v, plane_center, plane_normal);
     }
@@ -390,9 +406,17 @@ SAT_Result sat(SAT_Input lhs, SAT_Input rhs) {
         // Ensure the collision normal always goes from RHS to LHS
         if(sat_dot(state.lhs_to_rhs, result.normal) > 0.0) result.normal = sat_negate(result.normal);
     
-#if false
-        result.world_space_position_count = 4; // @Robustness: When an edge collides with a face, we only have two points. When a corner collides with a face, we only have one point.
+#if SAT_RETURN_ALL_COLLISION_POINTS
         for(int i = 0; i < 4; ++i) result.world_space_positions[i] = state.significant_face[SAT_SIGNIFICANT_FACE_incident].corners[i];
+
+        // Attempt a heuristic way of finding out how many different world space positions there are.
+        // If this is a point-against-whatever collision, there all these world space positions will
+        // be the same, and we only want to run the contact solver once.
+        // If there is an edge-against-whatever collision, there will be two different points to solve.
+        // If there is a face-against-face collision, there will be four points.
+        result.world_space_position_count = 1;
+        if(!sat_fuzzy_compare(result.world_space_positions[0], result.world_space_positions[1])) result.world_space_position_count *= 2;
+        if(!sat_fuzzy_compare(result.world_space_positions[0], result.world_space_positions[2])) result.world_space_position_count *= 2;
 #else
         //
         // Find the one average position of the contact area for a simpler collision resolution.

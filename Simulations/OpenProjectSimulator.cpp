@@ -12,17 +12,17 @@ double win32_performance_frequency;
 Mat3 mat3_from_quaternion(Quat & q) {
 	Mat3 result;
 
-	result._m[0][0] = 1.0f - 2.0f * q.y * q.y - 2.0f * q.z * q.z;
-	result._m[0][1] = 2.0f * q.x * q.y - 2.0f * q.z * q.w;
-	result._m[0][2] = 2.0f * q.x * q.z + 2.0f * q.y * q.w;
+	result._m[0][0] = 1.0 - 2.0 * q.y * q.y - 2.0 * q.z * q.z;
+	result._m[0][1] = 2.0 * q.x * q.y + 2.0 * q.z * q.w;
+	result._m[0][2] = 2.0 * q.x * q.z - 2.0 * q.y * q.w;
 
-    result._m[1][0] = 2.0f * q.x * q.y + 2.0f * q.z * q.w;
-	result._m[1][1] = 1.0f - 2.0f * q.x * q.x - 2.0f * q.z * q.z;
-	result._m[1][2] = 2.0f * q.y * q.z - 2.0f * q.x * q.w;
+    result._m[1][0] = 2.0 * q.x * q.y - 2.0 * q.z * q.w;
+	result._m[1][1] = 1.0 - 2.0 * q.x * q.x - 2.0 * q.z * q.z;
+	result._m[1][2] = 2.0 * q.y * q.z + 2.0 * q.x * q.w;
 
-    result._m[2][0] = 2.0f * q.x * q.z - 2.0f * q.y * q.w;
-	result._m[2][1] = 2.0f * q.y * q.z + 2.0f * q.x * q.w;
-	result._m[2][2] = 1.0f - 2.0f * q.x * q.x - 2.0f * q.y * q.y;
+    result._m[2][0] = 2.0 * q.x * q.z + 2.0 * q.y * q.w;
+	result._m[2][1] = 2.0 * q.y * q.z - 2.0 * q.x * q.w;
+	result._m[2][2] = 1.0 - 2.0 * q.x * q.x - 2.0 * q.y * q.y;
 
 	return result;
 }
@@ -30,17 +30,17 @@ Mat3 mat3_from_quaternion(Quat & q) {
 Mat3 mat3_mul_mat3(Mat3 & lhs, Mat3 & rhs) {
 	Mat3 result;
 
-	result._m[0][0] = lhs._m[0][0] * rhs._m[0][0] + lhs._m[0][1] * rhs._m[1][0] + lhs._m[0][2] * rhs._m[2][0];
-	result._m[0][1] = lhs._m[0][0] * rhs._m[0][1] + lhs._m[0][1] * rhs._m[1][1] + lhs._m[0][2] * rhs._m[2][1];
-	result._m[0][2] = lhs._m[0][0] * rhs._m[0][2] + lhs._m[0][1] * rhs._m[1][2] + lhs._m[0][2] * rhs._m[2][2];
+	result._m[0][0] = lhs._m[0][0] * rhs._m[0][0] + lhs._m[1][0] * rhs._m[0][1] + lhs._m[2][0] * rhs._m[0][2];
+	result._m[0][1] = lhs._m[0][1] * rhs._m[0][0] + lhs._m[1][1] * rhs._m[0][1] + lhs._m[2][1] * rhs._m[0][2];
+	result._m[0][2] = lhs._m[0][2] * rhs._m[0][0] + lhs._m[1][2] * rhs._m[0][1] + lhs._m[2][2] * rhs._m[0][2];
 	
-	result._m[1][0] = lhs._m[1][0] * rhs._m[0][0] + lhs._m[1][1] * rhs._m[1][0] + lhs._m[1][2] * rhs._m[2][0];
-	result._m[1][1] = lhs._m[1][0] * rhs._m[0][1] + lhs._m[1][1] * rhs._m[1][1] + lhs._m[1][2] * rhs._m[2][1];
-	result._m[1][2] = lhs._m[1][0] * rhs._m[0][2] + lhs._m[1][1] * rhs._m[1][2] + lhs._m[1][2] * rhs._m[2][2];
+	result._m[1][0] = lhs._m[0][0] * rhs._m[1][0] + lhs._m[1][0] * rhs._m[1][1] + lhs._m[2][0] * rhs._m[1][2];
+	result._m[1][1] = lhs._m[0][1] * rhs._m[1][0] + lhs._m[1][1] * rhs._m[1][1] + lhs._m[2][1] * rhs._m[1][2];
+	result._m[1][2] = lhs._m[0][2] * rhs._m[1][0] + lhs._m[1][2] * rhs._m[1][1] + lhs._m[2][2] * rhs._m[1][2];
 	
-	result._m[2][0] = lhs._m[2][0] * rhs._m[0][0] + lhs._m[2][1] * rhs._m[1][0] + lhs._m[2][2] * rhs._m[2][0];
-	result._m[2][1] = lhs._m[2][0] * rhs._m[0][1] + lhs._m[2][1] * rhs._m[1][1] + lhs._m[2][2] * rhs._m[2][1];
-	result._m[2][2] = lhs._m[2][0] * rhs._m[0][2] + lhs._m[2][1] * rhs._m[1][2] + lhs._m[2][2] * rhs._m[2][2];
+	result._m[2][0] = lhs._m[0][0] * rhs._m[2][0] + lhs._m[1][0] * rhs._m[2][1] + lhs._m[2][0] * rhs._m[2][2];
+	result._m[2][1] = lhs._m[0][1] * rhs._m[2][0] + lhs._m[1][1] * rhs._m[2][1] + lhs._m[2][1] * rhs._m[2][2];
+	result._m[2][2] = lhs._m[0][2] * rhs._m[2][0] + lhs._m[1][2] * rhs._m[2][1] + lhs._m[2][2] * rhs._m[2][2];
 
 	return result;
 }
@@ -48,9 +48,9 @@ Mat3 mat3_mul_mat3(Mat3 & lhs, Mat3 & rhs) {
 Vec3 mat3_mul_vec3(Mat3 & lhs, Vec3 & rhs) {
 	Vec3 result;
 
-	result.x = lhs._m[0][0] * rhs.x + lhs._m[0][1] * rhs.y + lhs._m[0][2] * rhs.z;
-	result.y = lhs._m[1][0] * rhs.x + lhs._m[1][1] * rhs.y + lhs._m[1][2] * rhs.z;
-	result.z = lhs._m[2][0] * rhs.x + lhs._m[2][1] * rhs.y + lhs._m[2][2] * rhs.z;
+	result.x = lhs._m[0][0] * rhs.x + lhs._m[1][0] * rhs.y + lhs._m[2][0] * rhs.z;
+	result.y = lhs._m[0][1] * rhs.x + lhs._m[1][1] * rhs.y + lhs._m[2][1] * rhs.z;
+	result.z = lhs._m[0][2] * rhs.x + lhs._m[1][2] * rhs.y + lhs._m[2][2] * rhs.z;
 
 	return result;
 }
@@ -73,24 +73,6 @@ Mat3 mat3_tranpose(Mat3 & input) {
 	return result;
 }
 
-Mat3 mat3_inverse(Mat3 & input) {        
-    Real determinant = static_cast<Real>(1) /
-        (input._m[0][0] * (input._m[1][1] * input._m[2][2] - input._m[2][1] * input._m[1][2]) -
-         input._m[1][0] * (input._m[0][1] * input._m[2][2] - input._m[2][1] * input._m[0][2]) +
-         input._m[2][0] * (input._m[0][1] * input._m[1][2] - input._m[1][1] * input._m[0][2]));
-        
-    Mat3 inverse;
-    inverse._m[0][0] = +(input._m[1][1] * input._m[2][2] - input._m[2][1] * input._m[1][2]) * determinant;
-    inverse._m[1][0] = -(input._m[1][0] * input._m[2][2] - input._m[2][0] * input._m[1][2]) * determinant;
-    inverse._m[2][0] = +(input._m[1][0] * input._m[2][1] - input._m[2][0] * input._m[1][1]) * determinant;
-    inverse._m[0][1] = -(input._m[0][1] * input._m[2][2] - input._m[2][1] * input._m[0][2]) * determinant;
-    inverse._m[1][1] = +(input._m[0][0] * input._m[2][2] - input._m[2][0] * input._m[0][2]) * determinant;
-    inverse._m[2][1] = -(input._m[0][0] * input._m[2][1] - input._m[2][0] * input._m[0][1]) * determinant;
-    inverse._m[0][2] = +(input._m[0][1] * input._m[1][2] - input._m[1][1] * input._m[0][2]) * determinant;
-    inverse._m[1][2] = -(input._m[0][0] * input._m[1][2] - input._m[1][0] * input._m[0][2]) * determinant;
-    inverse._m[2][2] = +(input._m[0][0] * input._m[1][1] - input._m[1][0] * input._m[0][1]) * determinant;
-    return inverse;  
-}
 
 
 Real turns_to_radians(Real value) {
@@ -170,23 +152,27 @@ SAT_Input sat_input(Rigid_Body & body) {
 void Rigid_Body::create(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(mass >= 0.f && "Invalid Mass for Rigid Body.");
 
-	this->size           = size;
-	this->inverse_mass   = mass > 0.0 ? 1.0 / mass : 0.0;
-    this->restitution    = restitution;
-    this->is_trigger     = is_trigger;
-    this->linear_factor  = Vec3(1, 1, 1);
-    this->angular_factor = Vec3(1, 1, 1);
+	this->size          = size;
+	this->inverse_mass  = mass > 0.0 ? 1.0 / mass : 0.0;
+    this->restitution   = restitution;
+    this->is_trigger    = is_trigger;
+    this->sleeping      = false;
+    this->inactive_time = 0.f;
+    
+    const Real damping = 1.0;
+    this->linear_factor  = Vec3(damping, damping, damping);
+    this->angular_factor = Vec3(damping, damping, damping);
 
-	if(mass > 0) {
+	if(this->inverse_mass > 0) {
         Real lx = this->size.x, ly = this->size.y, lz = this->size.z; // The size vector is already in full extends.
         
 		this->inverse_I0 = { 12.0 * this->inverse_mass / (ly * ly + lz * lz), 0, 0,
 					         0, 12.0 * this->inverse_mass / (lx * lx + lz * lz), 0 ,
 				             0, 0, 12.0 * this->inverse_mass / (lx * lx + ly * ly) };
 	} else {
-		this->inverse_I0 = { 1, 0, 0,
-					         0, 1, 0 ,
-				             0, 0, 1 };
+		this->inverse_I0 = { 0, 0, 0,
+					         0, 0, 0 ,
+				             0, 0, 0 };
 	}
 
 	this->warp(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
@@ -197,12 +183,16 @@ void Rigid_Body::warp(Vec3 center, Quat orientation) {
 	this->orientation    = orientation.unit();
 
 	this->frame_force          = Vec3(0, 0, 0);
+	this->frame_linear_impulse = Vec3(0, 0, 0);
 	this->linear_velocity      = Vec3(0, 0, 0);
 	
     this->frame_torque          = Vec3(0, 0, 0);
+    this->frame_angular_impulse = Vec3(0, 0, 0);
     this->angular_velocity      = Vec3(0, 0, 0);
 	this->angular_momentum      = Vec3(0, 0, 0);
 
+    this->awake();
+    
     this->build_inertia_tensor();
 	this->build_transformation_matrix();
 }
@@ -220,7 +210,11 @@ void Rigid_Body::build_inertia_tensor() {
     // Copied from https://github.com/bulletphysics/bullet3/blob/master/src/BulletDynamics/Dynamics/btRigidBody.cpp
     Mat3 rotation_matrix = mat3_from_quaternion(this->orientation);
     Mat3 transposed_rotation_matrix = mat3_tranpose(rotation_matrix);
+
     this->inverse_inertia = mat3_mul_mat3(mat3_mul_mat3(rotation_matrix, this->inverse_I0), transposed_rotation_matrix);
+
+    // Calculate the angular velocity based on the inertia.
+    this->angular_velocity = mat3_mul_vec3(this->inverse_inertia, this->angular_momentum);    
 }
 
 void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
@@ -228,21 +222,19 @@ void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
 
 	this->frame_force  += force;
 	this->frame_torque += cross(position_relative_to_center, force);
-}
-
-void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
-	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
-
-	this->linear_velocity  += impulse * this->linear_factor * this->inverse_mass;
-	this->angular_momentum += cross(position_relative_to_center, impulse) * this->angular_factor;
-}
-
-void Rigid_Body::apply_angular_impulse(Vec3 impulse) {
-    this->angular_momentum += impulse;
+    this->maybe_awake();
 }
 
 void Rigid_Body::apply_torque(Vec3 torque) {
 	this->frame_torque += torque;
+    this->maybe_awake();
+}
+
+void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
+	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
+    this->linear_velocity += impulse * this->inverse_mass;
+    this->angular_momentum += cross(position_relative_to_center, impulse);
+    this->maybe_awake();
 }
 
 void Rigid_Body::set_linear_factor(Vec3 factor) {
@@ -251,6 +243,32 @@ void Rigid_Body::set_linear_factor(Vec3 factor) {
 
 void Rigid_Body::set_angular_factor(Vec3 factor) {
     this->angular_factor = factor;
+}
+
+void Rigid_Body::maybe_sleep(float dt) {
+    this->inactive_time += dt;
+
+    if(this->inactive_time > 2.f) {
+        this->linear_velocity  = Vec3(0.);
+        this->angular_momentum = Vec3(0.);
+        this->angular_velocity = Vec3(0.);
+        this->sleeping = true;
+    }
+}
+
+void Rigid_Body::maybe_awake() {
+    return;
+    if(dot(this->linear_velocity, this->linear_velocity) > RIGID_BODY_SLEEP_THRESHOLD || dot(this->angular_velocity, this->angular_velocity) > RIGID_BODY_SLEEP_THRESHOLD)
+        this->awake();
+}
+
+void Rigid_Body::awake() {
+    this->sleeping = false;
+    this->inactive_time = 0;
+}
+
+bool Rigid_Body::inactive() {
+    return this->inverse_mass == 0 || this->sleeping;
 }
 
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
@@ -336,6 +354,7 @@ void TW_CALL tw_reset_button_callback(void *user_pointer) {
 OpenProjectSimulator::OpenProjectSimulator() {
     this->DUC = NULL;
     setup_timing();
+    this->set_default_camera_position();
 }
 
 const char * OpenProjectSimulator::getTestCasesStr() {
@@ -370,7 +389,6 @@ void OpenProjectSimulator::reset() {
     
     this->heat_alpha = 0.5f; // Half decay.
     
-    this->set_default_camera_position();
     this->setup_game();    
 }
 
@@ -390,17 +408,31 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
     }
     
     //
+    // Prepare the frame.
+    //
+    this->debug_draw_points.clear();
+
+    //
     // :TimeStep
     //
 #if USE_FIXED_DT
     double now = get_current_time_in_milliseconds();
+    
+    //
+    // Run the actual game logic.
+    //
+    this->update_game_logic(FIXED_DT * this->time_factor);
 
+    //
+    // Run the physics engine to keep up with the requested timestep.
+    //
     while(now - this->time_of_previous_update > FIXED_DT) {
-        this->update_game(FIXED_DT * this->time_factor);
+        this->update_physics_engine(FIXED_DT * this->time_factor);
         this->time_of_previous_update += FIXED_DT;
     }
 #else
-    this->update_game(timestep);
+    this->update_game_logic(timestep);
+this->update_physics_engine(timestep);
 #endif
 }
 
@@ -518,25 +550,24 @@ void OpenProjectSimulator::setup_demo_scene() {
     //
     // Set up a rigid body.
     //
-    if(true) {        
-        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4),  0, 1, false);
-        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, 1, false);
-        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, 1, false);
-        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, 1, false);
-        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, 1, false);
+    if(true) {
+        Real restitution = .2;
         
-        wall_north->warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
-        wall_south->warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
-        wall_east ->warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
-        wall_west ->warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
-
         for(int i = 0; i < 10; ++i) {
-            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1, 1, false);
+            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.25, .25, .25), 1, restitution, false);
             ball->warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
-            ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
         
-        this->gravity = 0;
+        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(6, 1,  6), 0, restitution, false);
+        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(6, 6, .2), 0, restitution, false);
+        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(6, 6, .2), 0, restitution, false);
+        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 6, 6), 0, restitution, false);
+        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 6, 6), 0, restitution, false);
+        
+        wall_north->warp(Vec3(0, 3, -3), Quat(0, 0, 0, 1));
+        wall_south->warp(Vec3(0, 3,  3), Quat(0, 0, 0, 1));
+        wall_east ->warp(Vec3(-3, 3, 0), Quat(0, 0, 0, 1));
+        wall_west ->warp(Vec3( 3, 3, 0), Quat(0, 0, 0, 1));        
     }
     
     //
@@ -559,8 +590,8 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 1, false);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 1, false);
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 0, false);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 0, false);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -568,8 +599,8 @@ void OpenProjectSimulator::setupWalls()
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, true);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, true);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -623,19 +654,31 @@ void OpenProjectSimulator::setupBall()
 
 void OpenProjectSimulator::set_default_camera_position() {
     if(this->DUC) {
+#if USE_PHYSICS_TEST_SCENE
+        this->DUC->g_camera.Reset();
+        this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
+#else
         const float lookat_size = 16.0f;
         
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+#endif
     }
 }
 
 void OpenProjectSimulator::setup_game() {
+#if USE_PHYSICS_TEST_SCENE
+    this->setup_demo_scene();
+    this->gravity = -10;
+    this->running = false;
+#else
     this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+#endif
+
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
@@ -647,7 +690,7 @@ void OpenProjectSimulator::setup_game() {
 // @Incomplete: Set up the proper scene -> JERRY
 //
 
-void OpenProjectSimulator::game_logic(float dt) {
+void OpenProjectSimulator::update_game_logic(float dt) {
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
     // for the other player.
@@ -658,7 +701,7 @@ void OpenProjectSimulator::game_logic(float dt) {
         printf("Player one has scored!\n");
     }
 
-    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+    if(this->trigger_collision_occurred(this->goals[1], this->ball)) {
         // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
         // exists.
         printf("Player zero has scored!\n");
@@ -669,7 +712,7 @@ void OpenProjectSimulator::game_logic(float dt) {
     //
 
     //
-    // @Incomplete: Move the player rackets depending on player input -> MANU
+    // Move the player rackets depending on player input -> MANU
     //
 
     if(DXUTIsKeyDown(VK_UP))
@@ -679,10 +722,10 @@ void OpenProjectSimulator::game_logic(float dt) {
     {
         this->player_rackets[1].platform->apply_impulse(player_rackets[1].platform->center_of_mass, Vec3(0, -.1, 0));
     }
-    if(DXUTIsKeyDown(0x57))
+    if(DXUTIsKeyDown('W'))
     {
         this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, 0.1, 0));
-    }else if(DXUTIsKeyDown(0x53))
+    } else if(DXUTIsKeyDown('S'))
     {
         this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, -0.1, 0));
     }
@@ -693,9 +736,7 @@ void OpenProjectSimulator::game_logic(float dt) {
     //
 }
 
-void OpenProjectSimulator::update_game(float dt) {
-    this->game_logic(dt);
-
+void OpenProjectSimulator::update_physics_engine(float dt) {
     //
     // Update the mass-spring-system using the Midpoint method.
     //
@@ -914,7 +955,7 @@ void OpenProjectSimulator::update_game(float dt) {
         //
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
-    	    if(body.inverse_mass == 0) continue;
+    	    if(body.inactive()) continue;
             
             body.linear_velocity.y += dt * this->gravity;
         }
@@ -928,7 +969,7 @@ void OpenProjectSimulator::update_game(float dt) {
 
             for(int j = i + 1; j < this->rigid_body_count; ++j) {
                 Rigid_Body & rhs = this->rigid_bodies[j];
-                if(lhs.inverse_mass == 0 && rhs.inverse_mass == 0) continue; // Don't do collisions between two static objects.
+                if(lhs.inactive() && rhs.inactive()) continue; // Don't do collisions between two static or sleeping objects.
 
                 //
                 // Check for a collision between the two bodies.
@@ -937,12 +978,14 @@ void OpenProjectSimulator::update_game(float dt) {
                 SAT_Result result = sat(sat_lhs, sat_rhs);
                 if(!result.found_collision) continue;
 
+                lhs.maybe_awake();
+                rhs.maybe_awake();
+                
                 if(lhs.is_trigger) {
                     Trigger_Collision collision;
                     collision.trigger = &lhs;
                     collision.other   = &rhs;
                     this->trigger_collisions.push_back(collision);
-                    continue;
                 }
 
                 if(rhs.is_trigger) {
@@ -950,41 +993,27 @@ void OpenProjectSimulator::update_game(float dt) {
                     collision.trigger = &rhs;
                     collision.other   = &lhs;
                     this->trigger_collisions.push_back(collision);
-                    continue;
                 }
                 
-                Real point_factor = 1.0 / (Real) result.world_space_position_count;
                 Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
                 
                 //
                 // Handle each contact point.
                 //
                 for(int k = 0; k < result.world_space_position_count; ++k) {
+                    //
+                    // Move the two objects apart along the penetration normal by a tiny bit, to combat
+                    // numerical errors over time when stacked.
+                    //
+
                     Vec3 contact_point = Vec3(result.world_space_positions[k].x, result.world_space_positions[k].y, result.world_space_positions[k].z);
                     Vec3 contact_point_velocity_lhs = lhs.get_world_space_velocity_at(contact_point);
                     Vec3 contact_point_velocity_rhs = rhs.get_world_space_velocity_at(contact_point);
 
                     Vec3 relative_velocity = contact_point_velocity_lhs - contact_point_velocity_rhs;
                     Real rv_dot_normal = dot(relative_velocity, contact_normal);
-                    if(rv_dot_normal > 0.0) continue; // Bodies are already separating, nothing to do.
 
-                    //
-                    // Move the two objects apart along the penetration normal by a tiny bit, to combat
-                    // numerical errors over time when stacked.
-                    //
-
-                    {
-                        Real normal_magnitude = sqrt(contact_normal.x * contact_normal.x + contact_normal.y * contact_normal.y + contact_normal.z * contact_normal.z);
-                        Real lhs_factor = lhs.inverse_mass * abs(dot(contact_normal, lhs.linear_factor) / normal_magnitude);
-                        Real rhs_factor = rhs.inverse_mass * abs(dot(contact_normal, rhs.linear_factor) / normal_magnitude);
-
-                        if(lhs_factor + rhs_factor >= 0.0001) {
-                            Real correction_factor = 0.2 * result.depth;
-                            Vec3 correction_vector = contact_normal * correction_factor;
-                            lhs.center_of_mass += correction_vector * lhs_factor / (lhs_factor + rhs_factor);
-                            rhs.center_of_mass -= correction_vector * rhs_factor / (lhs_factor + rhs_factor);
-                        }
-                    }
+                    if(rv_dot_normal > 0.0) return; // Points are already separating.
 
                     //
                     // Do a proper collision response, by calculating the impulse between the two bodies,
@@ -999,22 +1028,43 @@ void OpenProjectSimulator::update_game(float dt) {
                     Vec3 collision_point_on_lhs_cross_normal = cross(collision_point_on_lhs, contact_normal);
                     Vec3 collision_point_on_rhs_cross_normal = cross(collision_point_on_rhs, contact_normal);
 
-                    Vec3 applied_inerta_on_lhs = cross(mat3_mul_vec3(lhs.inverse_inertia, collision_point_on_lhs_cross_normal), collision_point_on_lhs);
-                    Vec3 applied_inerta_on_rhs = cross(mat3_mul_vec3(rhs.inverse_inertia, collision_point_on_rhs_cross_normal), collision_point_on_rhs);
+                    Vec3 applied_inertia_on_lhs = cross(mat3_mul_vec3(lhs.inverse_inertia, collision_point_on_lhs_cross_normal), collision_point_on_lhs);
+                    Vec3 applied_inertia_on_rhs = cross(mat3_mul_vec3(rhs.inverse_inertia, collision_point_on_rhs_cross_normal), collision_point_on_rhs);
 
                     Real impulse_magnitude_nominator   = -(1 + restitution) * rv_dot_normal;
-                    Real impulse_magnitude_denominator = lhs.inverse_mass + rhs.inverse_mass + dot(applied_inerta_on_lhs + applied_inerta_on_rhs, contact_normal);
+                    Real impulse_magnitude_denominator = lhs.inverse_mass + rhs.inverse_mass + dot(applied_inertia_on_lhs + applied_inertia_on_rhs, contact_normal);
 
-                    Real impulse_magnitude = impulse_magnitude_nominator / impulse_magnitude_denominator; // AKA Big 'J'.
+                    Real penetration_magnitude_nominator = 0.f;
+
+#if RIGID_BODY_POSITION_ERROR_CORRECTION
+                    //
+                    // The impulse calculation assumes a sort of perfect world, in which the penetration
+                    // is just about to happen and therefore has a depth of 0. We don't do continuous
+                    // collision detection, and we certainly aren't in a perfect world, so add another
+                    // small impulse to resolve the actual penetration.
+                    //
+                    penetration_magnitude_nominator = (0.2 * result.depth) / dt;
+#endif
+
+
+                    Real impulse_magnitude = (impulse_magnitude_nominator + penetration_magnitude_nominator) / (impulse_magnitude_denominator); // AKA Big 'J'.
                     
-                    Vec3 impulse = contact_normal * impulse_magnitude * point_factor;
-
+                    Vec3 impulse = contact_normal * impulse_magnitude;
+                    
                     //
                     // Apply the impulse to both bodies.
                     //
 
                     lhs.apply_impulse(contact_point,  impulse);
                     rhs.apply_impulse(contact_point, -impulse);
+
+                    //
+                    // Update the inertia tensor and angular velocities for the next
+                    // contact points in this frame.
+                    //
+
+                    lhs.build_inertia_tensor();
+                    rhs.build_inertia_tensor();
                 }
             }
         }
@@ -1025,33 +1075,32 @@ void OpenProjectSimulator::update_game(float dt) {
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
     	    if(body.inverse_mass == 0) continue;
-
+            
             float dt_2 = dt * 0.5;
 
             //
             // Integrate the linear part using Euler.
             //
 
+            body.linear_velocity += body.frame_linear_impulse;
             body.center_of_mass   = body.center_of_mass  + body.linear_velocity * dt; // Integrate the position
             body.linear_velocity  = body.linear_velocity + body.frame_force * body.inverse_mass * dt; // Integrate the velocity.
             body.linear_velocity *= body.linear_factor;
 
             // Reset the accumulators every frame.
             body.frame_force = { 0 };
-            
+            body.frame_linear_impulse = { 0 };
+
             //
             // Integrate the angular part.
             //
 
             // Integrate the angular momentum
-            body.angular_momentum  = body.angular_momentum + dt * body.frame_torque;
+            body.angular_momentum  = body.angular_momentum + body.frame_angular_impulse + dt * body.frame_torque;
             body.angular_momentum *= body.angular_factor;
             
-            // Calculate the new inertia tensor
+            // Update the inertiat tensor and the angular velocity.
             body.build_inertia_tensor();
-                        
-            // Calculate the angular velocity for this frame.
-            body.angular_velocity = mat3_mul_vec3(body.inverse_inertia, body.angular_momentum);
 
             // Integrate the rotation
             body.orientation = body.orientation + dt_2 * Quat(body.angular_velocity.x, body.angular_velocity.y, body.angular_velocity.z, 0) * body.orientation;
@@ -1059,12 +1108,25 @@ void OpenProjectSimulator::update_game(float dt) {
 
             // Reset the accumulators every frame.
             body.frame_torque = { 0 };
+            body.frame_angular_impulse = { 0 };
             
             //
             // Finally build the new transformation matrices.
             //
             
             body.build_transformation_matrix();
+
+            //
+            // Put the body to sleep if it is barely moving.
+            //
+
+            Real sleep_threshold = this->gravity * dt + dt;
+            
+            if(dot(body.linear_velocity, body.linear_velocity) <= RIGID_BODY_SLEEP_THRESHOLD && dot(body.angular_velocity, body.angular_velocity) <= RIGID_BODY_SLEEP_THRESHOLD) {
+                body.maybe_sleep(dt);
+            } else {
+                body.awake();
+            }
         }
     }
 
@@ -1124,11 +1186,6 @@ void OpenProjectSimulator::draw_game() {
                 else
                     color = lerp(medium_color, cold_color, -value);
 
-                // just for debugging
-                //color = Vec3(0, 0, 0);
-                //if ((x + y) % 2 == 0){
-                //    color = Vec3(1,1,1);
-                //}
                 this->DUC->setUpLighting(Vec3(0, 0, 0), color, 5, color);
 
                 // Draw Heat map as grid of cubes
@@ -1151,6 +1208,16 @@ void OpenProjectSimulator::draw_game() {
             this->DUC->setUpLighting(Vec3(0, 0, 0), body.albedo, 0.2, body.albedo);
             this->DUC->drawRigidBody(body.transformation * this->DUC->g_camera.GetWorldMatrix());
         }
+    }
+
+    //
+    // Debug draw all points.
+    //
+    for(Vec3 & point : this->debug_draw_points) {
+        Real sphere_radius = 0.05;
+        Real r = 1, g = 0, b = 0;
+        this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(r, g, b), 1, Vec3(r, g, b));
+        this->DUC->drawSphere(point, Vec3(sphere_radius, sphere_radius, sphere_radius));
     }
 }
 
@@ -1198,6 +1265,8 @@ void OpenProjectSimulator::debug_print() {
                 body.angular_momentum.x, body.angular_momentum.y, body.angular_momentum.z);
             printf("         Orientation = { %f, %f, %f, %f }, Angular Velocity = " PRINT_FIXED_VEC3 "\n", 
                 body.orientation.x, body.orientation.y, body.orientation.z, body.orientation.w, body.angular_velocity.x, body.angular_velocity.y, body.angular_velocity.z);
+            if(body.sleeping) printf("         Sleeping!\n");
+            else printf("         Inactive: %f\n", body.inactive_time);
         }
     }
 

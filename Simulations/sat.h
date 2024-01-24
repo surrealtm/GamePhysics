@@ -8,8 +8,9 @@
 // https://jkh.me/files/tutorials/Separating%20Axis%20Theorem%20for%20Oriented%20Bounding%20Boxes.pdf
 //
 
-#define SAT_USE_MINIMAL_TRANSLATION_VECTOR true // Resolve along the axis with the least penetration
-//#define SAT_USE_PROJECTED_VELOCITY true // Resolve along the axis most parallel to the relative velocity
+#define SAT_EPSILON 0.0001
+
+#define SAT_RETURN_ALL_COLLISION_POINTS false // We can either return all 4 corners of the collision face, or the average (center) position of that area. The first one might be more accurate in edge-cases, the second one is a lot faster...
 
 /* =============================== SAT API =============================== */
 
