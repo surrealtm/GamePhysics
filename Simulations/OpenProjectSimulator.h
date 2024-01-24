@@ -80,7 +80,9 @@ struct Rigid_Body {
 	
 	Vec3 albedo;
 
-	void create(Vec3 size, Real mass);
+	bool is_trigger;
+
+	void create(Vec3 size, Real mass, bool is_trigger);
 	void warp(Vec3 center, Quat orientation);
 	void build_transformation_matrix();
     void build_inertia_tensor();
@@ -91,6 +93,14 @@ struct Rigid_Body {
     void apply_torque(Vec3 torque);
     
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
+};
+
+// This records a collision between a trigger rigid body and another rigid body.
+// It is only present the frame after the collision happened (since the collision
+// detection happens after the game logic, but we want this info in the game logic).
+struct Trigger_Collision {
+	Rigid_Body *trigger;
+	Rigid_Body *other;
 };
 
 struct Player_Racket
@@ -155,7 +165,7 @@ public:
 
 	int create_masspoint(Vec3 position, Real mass);
 	int create_spring(int a, int b, Real initial_length, Real stiffness);
-	int create_rigid_body(Vec3 size, Real mass);
+	int create_rigid_body(Vec3 size, Real mass, bool is_trigger);
 
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
@@ -177,7 +187,7 @@ public:
 
 private:
     Rigid_Body * query_rigid_body(int index);
-    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass);
+    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger);
 
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
@@ -214,7 +224,9 @@ private:
 	//
 	Rigid_Body rigid_bodies[MAX_RIGID_BODIES];
 	int rigid_body_count;
-    
+
+	std::vector<Trigger_Collision> trigger_collisions;
+
 	Rigid_Body * normal_walls[2];
 	Rigid_Body * goals[2];
 	Rigid_Body * ball;

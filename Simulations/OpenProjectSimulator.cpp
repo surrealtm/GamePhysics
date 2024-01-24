@@ -167,11 +167,12 @@ SAT_Input sat_input(Rigid_Body & body) {
 // Rigid Bodies.
 //
 
-void Rigid_Body::create(Vec3 size, Real mass) {
+void Rigid_Body::create(Vec3 size, Real mass, bool is_trigger) {
     assert(mass >= 0.f && "Invalid Mass for Rigid Body.");
 
 	this->size = size;
 	this->inverse_mass = mass > 0.0 ? 1.0 / mass : 0.0;
+    this->is_trigger = is_trigger;
 
 	if(mass > 0) {
         Real lx = this->size.x, ly = this->size.y, lz = this->size.z; // The size vector is already in full extends.
@@ -404,12 +405,12 @@ int OpenProjectSimulator::create_spring(int a, int b, Real initial_length, Real 
     return index;
 }
 
-int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass) {
+int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, bool is_trigger) {
     assert(this->rigid_body_count < MAX_RIGID_BODIES);
     int index = this->rigid_body_count;
 
     Rigid_Body & body = this->rigid_bodies[index];
-    body.create(size, mass);
+    body.create(size, mass, is_trigger);
     body.albedo = Vec3(random_float(0, 1), random_float(0, 1), random_float(0, 1));
     
     ++this->rigid_body_count;
@@ -421,8 +422,8 @@ Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
     return &this->rigid_bodies[index];
 }
 
-Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
-    return this->query_rigid_body(this->create_rigid_body(size, mass));
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
 }
 
 Spring * OpenProjectSimulator::query_spring(int index) {
@@ -470,11 +471,11 @@ void OpenProjectSimulator::setup_demo_scene() {
     // Set up a rigid body.
     //
     if(true) {        
-        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0);
-        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
-        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
+        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0, false);
+        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, false);
+        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0, false);
+        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, false);
+        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0, false);
         
         wall_north->warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
         wall_south->warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
@@ -482,7 +483,7 @@ void OpenProjectSimulator::setup_demo_scene() {
         wall_west ->warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
 
         for(int i = 0; i < 10; ++i) {
-            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
+            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1, false);
             ball->warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
             ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
@@ -510,16 +511,16 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100, false);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100, false);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 2, 0), Quat(0, 0, 0, 1));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -3, 0), Quat(0, 0, 0, 1));
 
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100, false);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100, false);
     goalLeft->warp(Vec3(-3, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 2, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
 
@@ -532,7 +533,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     float heightPos = heat_grid.height * heat_grid.scale / 2;
     // Player 1
     {
-        player_rackets[0].platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+        player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
         player_rackets[0].platform->warp(Vec3(0, heightPos, 0), Quat(0, 0, 0, 1));
     
         int m1 = create_masspoint(normal_walls[0]->center_of_mass, 1);
@@ -542,7 +543,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     
     // Player 2
     {
-        player_rackets[1].platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+        player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
         player_rackets[1].platform->warp(Vec3(heat_grid.width - 1, heightPos, 0), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(normal_walls[1]->center_of_mass, 1);
@@ -558,9 +559,9 @@ void OpenProjectSimulator::setupBall()
     float ballScale = 0.5f;
     float ballMass = 1.0f;
 
-    ball = rigid_bodies + create_rigid_body(Vec3(ballScale), ballMass);
-    ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, -0.75), Quat(0, 0, 0, 1));
-    ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
+    this->ball = this->create_and_query_rigid_body(Vec3(ballScale), ballMass, false);
+    this->ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, -0.75), Quat(0, 0, 0, 1));
+    this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
 
@@ -577,22 +578,26 @@ void OpenProjectSimulator::setup_game() {
     this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
+//
+// @Incomplete: Set up the proper scene -> JERRY
+//
+
 void OpenProjectSimulator::game_logic(float dt) {
     //
-    // @Incomplete: Handle goals
+    // @Incomplete: Handle goals -> VICTOR
     //
     
     //
-    // @Incomplete: Increase temperate of cell where the ball currently resides.
+    // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS
     //
 
     //
-    // @Incomplete: Move the player rackets depending on player input.
+    // @Incomplete: Move the player rackets depending on player input -> MANU
     //
     
     //
     // @Incomplete: Speed up or slow down the ball depending on the current
-    // cell temperature.
+    // cell temperature -> DENNIS
     //
 }
 
@@ -810,6 +815,8 @@ void OpenProjectSimulator::update_game(float dt) {
     // Update the rigid body system.
     //
     {
+        this->trigger_collisions.clear();
+
         //
         // Add gravity and external forces to all rigid bodies.
         //
@@ -837,6 +844,22 @@ void OpenProjectSimulator::update_game(float dt) {
                 SAT_Input sat_rhs = sat_input(rhs);
                 SAT_Result result = sat(sat_lhs, sat_rhs);
                 if(!result.found_collision) continue;
+
+                if(lhs.is_trigger) {
+                    Trigger_Collision collision;
+                    collision.trigger = &lhs;
+                    collision.other   = &rhs;
+                    this->trigger_collisions.push_back(collision);
+                    continue;
+                }
+
+                if(rhs.is_trigger) {
+                    Trigger_Collision collision;
+                    collision.trigger = &rhs;
+                    collision.other   = &lhs;
+                    this->trigger_collisions.push_back(collision);
+                    continue;
+                }
                 
                 Real point_factor = 1.0 / (Real) result.world_space_position_count;
                 Vec3 contact_normal = Vec3(result.normal.x, result.normal.y, result.normal.z);
@@ -944,7 +967,7 @@ void OpenProjectSimulator::update_game(float dt) {
         }
     }
 
-    //this->debug_print();
+    this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {
