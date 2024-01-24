@@ -321,6 +321,14 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
+float* Heat_Grid::get_cell_to_worldpos(int world_x, int world_y)
+{
+    int grid_x = world_x / scale;
+    int grid_y = world_y / scale;
+
+    return values + grid_y * width + grid_x;
+}
+
 
 //
 // Simulator
@@ -620,18 +628,19 @@ void OpenProjectSimulator::game_logic(float dt) {
         // exists.
         printf("Player zero has scored!\n");
     }
+
+    //get current position of ball on grid
+    float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    // increase speed of ball depending on temperature
+    ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell;
     
-    //
-    // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS
-    //
+    
+    // Increase temperate of cell where the ball currently is
+    // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
+    *temp_cell += heat_grid.heat_rise_by_ball;
 
     //
     // @Incomplete: Move the player rackets depending on player input -> MANU
-    //
-    
-    //
-    // @Incomplete: Speed up or slow down the ball depending on the current
-    // cell temperature -> DENNIS
     //
 }
 

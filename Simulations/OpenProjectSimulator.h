@@ -122,7 +122,8 @@ struct Heat_Grid {
 	int width = 0, height = 0;
 	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
-
+	float heat_rise_by_ball = 1.0f;
+	
 	void create(int width, int height);
 	void destroy();
 	void reset();
@@ -130,6 +131,7 @@ struct Heat_Grid {
 	void randomize();
 	void set(int x, int y, float value);
 	float get(int x, int y);
+	float* get_cell_to_worldpos(int world_x, int world_y);
 };
 
 //
@@ -237,6 +239,7 @@ private:
 	Rigid_Body * normal_walls[2];
 	Rigid_Body * goals[2];
 	Rigid_Body * ball;
+	float heat_accelleration_for_ball;
 	
 	Player_Racket player_rackets[2];
     
