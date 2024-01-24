@@ -569,7 +569,7 @@ void OpenProjectSimulator::setupWalls()
     normal_walls[1] = wallSouth;
     
     Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 1, 1, false);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
