@@ -511,18 +511,18 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100, false);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100, false);
-    wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 2, 0), Quat(0, 0, 0, 1));
-    wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -3, 0), Quat(0, 0, 0, 1));
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 100, false);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 100, false);
+    wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100, false);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100, false);
-    goalLeft->warp(Vec3(-3, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
-    goalRight->warp(Vec3(heatgrid_width + 2, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 100, false);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 100, false);
+    goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
     goals[0] = goalLeft;
     goals[1] = goalRight;
@@ -534,7 +534,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     // Player 1
     {
         player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
-        player_rackets[0].platform->warp(Vec3(0, heightPos, 0), Quat(0, 0, 0, 1));
+        player_rackets[0].platform->warp(Vec3(0, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = create_masspoint(normal_walls[0]->center_of_mass, 1);
         int m2 = create_masspoint(player_rackets[0].platform->center_of_mass, 1);
@@ -544,7 +544,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     // Player 2
     {
         player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
-        player_rackets[1].platform->warp(Vec3(heat_grid.width - 1, heightPos, 0), Quat(0, 0, 0, 1));
+        player_rackets[1].platform->warp(Vec3(heat_grid.width - 1, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(normal_walls[1]->center_of_mass, 1);
         int m2 = this->create_masspoint(player_rackets[1].platform->center_of_mass, 1);
@@ -556,11 +556,11 @@ void OpenProjectSimulator::setupBall()
 {
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
-    float ballScale = 0.5f;
+    float ballScale = 1.f;
     float ballMass = 1.0f;
 
     this->ball = this->create_and_query_rigid_body(Vec3(ballScale), ballMass, false);
-    this->ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, -0.75), Quat(0, 0, 0, 1));
+    this->ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
@@ -967,7 +967,7 @@ void OpenProjectSimulator::update_game(float dt) {
         }
     }
 
-    this->debug_print();
+    //this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {

@@ -10,7 +10,7 @@
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
-#define OFFSET_HEAT_GRID -0.75f // Offset to heat grid for walls, ball, player rackets
+#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
 
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
