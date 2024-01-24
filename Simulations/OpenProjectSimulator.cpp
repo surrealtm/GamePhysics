@@ -170,9 +170,11 @@ SAT_Input sat_input(Rigid_Body & body) {
 void Rigid_Body::create(Vec3 size, Real mass, bool is_trigger) {
     assert(mass >= 0.f && "Invalid Mass for Rigid Body.");
 
-	this->size = size;
-	this->inverse_mass = mass > 0.0 ? 1.0 / mass : 0.0;
-    this->is_trigger = is_trigger;
+	this->size           = size;
+	this->inverse_mass   = mass > 0.0 ? 1.0 / mass : 0.0;
+    this->is_trigger     = is_trigger;
+    this->linear_factor  = Vec3(1, 1, 1);
+    this->angular_factor = Vec3(1, 1, 1);
 
 	if(mass > 0) {
         Real lx = this->size.x, ly = this->size.y, lz = this->size.z; // The size vector is already in full extends.
@@ -230,8 +232,8 @@ void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
 void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
-	this->linear_velocity  += impulse * this->inverse_mass;
-	this->angular_momentum += cross(position_relative_to_center, impulse);
+	this->linear_velocity  += impulse * this->linear_factor * this->inverse_mass;
+	this->angular_momentum += cross(position_relative_to_center, impulse) * this->angular_factor;
 }
 
 void Rigid_Body::apply_angular_impulse(Vec3 impulse) {
@@ -240,6 +242,14 @@ void Rigid_Body::apply_angular_impulse(Vec3 impulse) {
 
 void Rigid_Body::apply_torque(Vec3 torque) {
 	this->frame_torque += torque;
+}
+
+void Rigid_Body::set_linear_factor(Vec3 factor) {
+    this->linear_factor = factor;
+}
+
+void Rigid_Body::set_angular_factor(Vec3 factor) {
+    this->angular_factor = factor;
 }
 
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
@@ -417,23 +427,7 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, bool is_trigge
     return index;
 }
 
-Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
-    assert(index >= 0 && index < this->rigid_body_count);
-    return &this->rigid_bodies[index];
-}
 
-Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
-    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
-}
-
-Spring * OpenProjectSimulator::query_spring(int index) {
-    assert(index >= 0 && index < this->spring_count);
-    return &this->springs[index];    
-}
-
-Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
-    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
-}
 
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
     assert(index >= 0 && index < this->masspoint_count);
@@ -454,6 +448,34 @@ void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orient
     assert(index >= 0 && index < this->rigid_body_count);
     this->rigid_bodies[index].warp(position, orientation);
 }
+
+
+Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    return &this->rigid_bodies[index];
+}
+
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
+}
+
+Spring * OpenProjectSimulator::query_spring(int index) {
+    assert(index >= 0 && index < this->spring_count);
+    return &this->springs[index];    
+}
+
+Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
+    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
+}
+
+bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
+    for(Trigger_Collision & collision : this->trigger_collisions) {
+        if(collision.trigger == trigger && collision.other == other) return true;
+    }
+
+    return false;
+}
+
 
 void OpenProjectSimulator::setup_demo_scene() {
     //
@@ -584,8 +606,20 @@ void OpenProjectSimulator::setup_game() {
 
 void OpenProjectSimulator::game_logic(float dt) {
     //
-    // @Incomplete: Handle goals -> VICTOR
+    // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
+    // for the other player.
     //
+    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
+        // exists.
+        printf("Player one has scored!\n");
+    }
+
+    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
+        // exists.
+        printf("Player zero has scored!\n");
+    }
     
     //
     // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS
@@ -935,6 +969,7 @@ void OpenProjectSimulator::update_game(float dt) {
 
             body.center_of_mass   = body.center_of_mass  + body.linear_velocity * dt; // Integrate the position
             body.linear_velocity  = body.linear_velocity + body.frame_force * body.inverse_mass * dt; // Integrate the velocity.
+            body.linear_velocity *= body.linear_factor;
 
             // Reset the accumulators every frame.
             body.frame_force = { 0 };
@@ -944,7 +979,8 @@ void OpenProjectSimulator::update_game(float dt) {
             //
 
             // Integrate the angular momentum
-            body.angular_momentum = body.angular_momentum + dt * body.frame_torque;
+            body.angular_momentum  = body.angular_momentum + dt * body.frame_torque;
+            body.angular_momentum *= body.angular_factor;
             
             // Calculate the new inertia tensor
             body.build_inertia_tensor();
