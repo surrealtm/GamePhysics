@@ -10,7 +10,7 @@
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
-#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
+#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets to the front
 #define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to walls
 
 #define PRINT_FIXED_FLOAT "%2.05f"
@@ -124,7 +124,8 @@ struct Heat_Grid {
 	int width = 0, height = 0;
 	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
-
+	float heat_rise_by_ball = 1.0f;
+	
 	void create(int width, int height);
 	void destroy();
 	void reset();
@@ -132,6 +133,7 @@ struct Heat_Grid {
 	void randomize();
 	void set(int x, int y, float value);
 	float get(int x, int y);
+	float* get_cell_to_worldpos(float world_x, float world_y);
 };
 
 //
@@ -188,6 +190,8 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
+	void setupPoints();
+	void spawnPoint(int player);
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -244,9 +248,13 @@ private:
 
 	std::vector<Trigger_Collision> trigger_collisions;
 
-	Rigid_Body * normal_walls[2];
-	Rigid_Body * goals[2];
-	Rigid_Body * ball;
+	Rigid_Body* normal_walls[2];
+	Rigid_Body* goals[2];
+	Rigid_Body* ball;
+	Rigid_Body* points1[11];
+	Rigid_Body* points2[11];
+	float heat_accelleration_for_ball;
+
 	
 	Player_Racket player_rackets[2];
     

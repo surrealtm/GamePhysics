@@ -322,6 +322,14 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
+float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
+{
+    int grid_x = (world_x + scale/2) / scale;
+    int grid_y = (world_y + scale/2) / scale;
+
+    return values + grid_y * width + grid_x;
+}
+
 
 //
 // Simulator
@@ -616,7 +624,7 @@ void OpenProjectSimulator::setupBall()
     this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, 1, false);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
-    this->ball->set_angular_factor(Vec3(1, 1, 0));
+    this->ball->set_angular_factor(Vec3(0, 0, 1));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
@@ -630,12 +638,21 @@ void OpenProjectSimulator::set_default_camera_position() {
     }
 }
 
+void OpenProjectSimulator::setupPoints() {
+
+}
+
+void OpenProjectSimulator::spawnPoint(int player) {
+
+}
+
 void OpenProjectSimulator::setup_game() {
     this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+    setupPoints();
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
@@ -663,10 +680,16 @@ void OpenProjectSimulator::game_logic(float dt) {
         // exists.
         printf("Player zero has scored!\n");
     }
+
+    //get current position of ball on grid
+    float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    // increase speed of ball depending on temperature
+    ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell;
     
-    //
-    // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS
-    //
+    
+    // Increase temperate of cell where the ball currently is
+    // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
+    *temp_cell += heat_grid.heat_rise_by_ball;
 
     //
     // @Incomplete: Move the player rackets depending on player input -> MANU
@@ -1024,11 +1047,18 @@ void OpenProjectSimulator::update_game(float dt) {
                     // numerical errors over time when stacked.
                     //
 
-                    Real total_mass = lhs.inverse_mass + rhs.inverse_mass;
-                    Real correction_factor = 0.1;
-                    Vec3 correction_vector = contact_normal * correction_factor;
-                    lhs.center_of_mass += correction_vector * lhs.inverse_mass / total_mass;
-                    rhs.center_of_mass -= correction_vector * rhs.inverse_mass / total_mass;
+                    {
+                        Real normal_magnitude = sqrt(contact_normal.x * contact_normal.x + contact_normal.y * contact_normal.y + contact_normal.z * contact_normal.z);
+                        Real lhs_factor = lhs.inverse_mass * abs(dot(contact_normal, lhs.linear_factor) / normal_magnitude);
+                        Real rhs_factor = rhs.inverse_mass * abs(dot(contact_normal, rhs.linear_factor) / normal_magnitude);
+
+                        if(lhs_factor + rhs_factor >= 0.0001) {
+                            Real correction_factor = 0.2 * result.depth;
+                            Vec3 correction_vector = contact_normal * correction_factor;
+                            lhs.center_of_mass += correction_vector * lhs_factor / (lhs_factor + rhs_factor);
+                            rhs.center_of_mass -= correction_vector * rhs_factor / (lhs_factor + rhs_factor);
+                        }
+                    }
 
                     //
                     // Do a proper collision response, by calculating the impulse between the two bodies,
