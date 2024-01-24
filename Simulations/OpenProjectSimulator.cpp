@@ -244,6 +244,14 @@ void Rigid_Body::apply_torque(Vec3 torque) {
 	this->frame_torque += torque;
 }
 
+void Rigid_Body::set_linear_factor(Vec3 factor) {
+    this->linear_factor = factor;
+}
+
+void Rigid_Body::set_angular_factor(Vec3 factor) {
+    this->angular_factor = factor;
+}
+
 Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 

@@ -95,6 +95,7 @@ struct Rigid_Body {
     void apply_torque(Vec3 torque);
     
 	void set_linear_factor(Vec3 factor);
+	void set_angular_factor(Vec3 factor);
 
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
 };
