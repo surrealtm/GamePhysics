@@ -368,7 +368,6 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
 }
 
 void OpenProjectSimulator::externalForcesCalculations(float timeStep) {
-    // @Incomplete
 }
 
 void OpenProjectSimulator::onClick(int x, int y) {}
@@ -417,13 +416,22 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass) {
     return index;
 }
 
-Rigid_Body& OpenProjectSimulator::query_rigid_body(int index) {
+Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
     assert(index >= 0 && index < this->rigid_body_count);
-    return this->rigid_bodies[index];
+    return &this->rigid_bodies[index];
 }
 
-Rigid_Body& OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass) {
     return this->query_rigid_body(this->create_rigid_body(size, mass));
+}
+
+Spring * OpenProjectSimulator::query_spring(int index) {
+    assert(index >= 0 && index < this->spring_count);
+    return &this->springs[index];    
+}
+
+Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
+    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
 }
 
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
@@ -462,21 +470,21 @@ void OpenProjectSimulator::setup_demo_scene() {
     // Set up a rigid body.
     //
     if(true) {        
-        Rigid_Body & floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0);
-        Rigid_Body & wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body & wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
-        Rigid_Body & wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
-        Rigid_Body & wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
+        Rigid_Body * floor      = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0);
+        Rigid_Body * wall_north = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
+        Rigid_Body * wall_south = this->create_and_query_rigid_body(Vec3(4, 4, .2), 0);
+        Rigid_Body * wall_east  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
+        Rigid_Body * wall_west  = this->create_and_query_rigid_body(Vec3(.2, 4, 4), 0);
         
-        wall_north.warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
-        wall_south.warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
-        wall_east .warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
-        wall_west .warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
+        wall_north->warp(Vec3(0, 2, -2), Quat(0, 0, 0, 1));
+        wall_south->warp(Vec3(0, 2,  2), Quat(0, 0, 0, 1));
+        wall_east ->warp(Vec3(-2, 2, 0), Quat(0, 0, 0, 1));
+        wall_west ->warp(Vec3( 2, 2, 0), Quat(0, 0, 0, 1));
 
         for(int i = 0; i < 10; ++i) {
-            Rigid_Body & ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
-            ball.warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
-            ball.apply_angular_impulse(Vec3(1, 1, 1));
+            Rigid_Body * ball = this->create_and_query_rigid_body(Vec3(.5, .5, .5), 1);
+            ball->warp(Vec3(random_float(-2, 2), 4, random_float(-2, 2)), quat_from_euler_angles(random_float(0, 1), random_float(0, 1), random_float(0, 1)));
+            ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
         
         this->gravity = -10;
@@ -502,49 +510,45 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
-    Rigid_Body *wallSouth = rigid_bodies + create_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 5, 1), 100);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 2, 0), Quat(0, 0, 0, 1));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -3, 0), Quat(0, 0, 0, 1));
 
-
-    normal_walls[0] = *wallNorth;
-    normal_walls[1] = *wallSouth;
+    normal_walls[0] = wallNorth;
+    normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
-    Rigid_Body *goalRight = rigid_bodies + create_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(5, heatgrid_height, 1), 100);
     goalLeft->warp(Vec3(-3, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 2, (heatgrid_height - heat_grid.scale)/2, 0), Quat(0, 0, 0, 1));
 
-
-    goals[0] = *goalLeft;
-    goals[1] = *goalRight;
+    goals[0] = goalLeft;
+    goals[1] = goalRight;
 }
 
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
     float heightPos = heat_grid.height * heat_grid.scale / 2;
     // Player 1
-    Player_Racket p = Player_Racket();
-
-    p.platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
-    p.platform->warp(Vec3(0, heightPos, 0), Quat(0, 0, 0, 1));
+    {
+        player_rackets[0].platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+        player_rackets[0].platform->warp(Vec3(0, heightPos, 0), Quat(0, 0, 0, 1));
     
-    int m1 = create_masspoint(normal_walls[0].center_of_mass, 1);
-    int m2 = create_masspoint(p.platform->center_of_mass, 1);
-    p.spring = springs + create_spring(m1, m2, 1, 1);
-    player_rackets[0] = p;
+        int m1 = create_masspoint(normal_walls[0]->center_of_mass, 1);
+        int m2 = create_masspoint(player_rackets[0].platform->center_of_mass, 1);
+        player_rackets[0].spring = springs + create_spring(m1, m2, 1, 1);
+    }
     
     // Player 2
-    p = Player_Racket();
-
-    p.platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
-    p.platform->warp(Vec3(heat_grid.width - 1, heightPos, 0), Quat(0, 0, 0, 1));
+    {
+        player_rackets[1].platform = rigid_bodies + create_rigid_body(Vec3(1, 2, 1), 1);
+        player_rackets[1].platform->warp(Vec3(heat_grid.width - 1, heightPos, 0), Quat(0, 0, 0, 1));
     
-    m1 = create_masspoint(normal_walls[1].center_of_mass, 1);
-    m2 = create_masspoint(p.platform->center_of_mass, 1);
-    p.spring = springs + create_spring(m1, m2, 1, 1);
-    player_rackets[1] = p;
+        int m1 = this->create_masspoint(normal_walls[1]->center_of_mass, 1);
+        int m2 = this->create_masspoint(player_rackets[1].platform->center_of_mass, 1);
+        player_rackets[1].spring = this->create_and_query_spring(m1, m2, 1, 1);
+    }
 }
 
 void OpenProjectSimulator::setupBall()
@@ -573,15 +577,32 @@ void OpenProjectSimulator::setup_game() {
     this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
-void OpenProjectSimulator::update_game(float dt) {
-    // @Incomplete: Add external forces to each masspoint and rigid body.
+void OpenProjectSimulator::game_logic(float dt) {
+    //
+    // @Incomplete: Handle goals
+    //
     
+    //
+    // @Incomplete: Increase temperate of cell where the ball currently resides.
+    //
+
+    //
+    // @Incomplete: Move the player rackets depending on player input.
+    //
+    
+    //
+    // @Incomplete: Speed up or slow down the ball depending on the current
+    // cell temperature.
+    //
+}
+
+void OpenProjectSimulator::update_game(float dt) {
+    this->game_logic(dt);
+
     //
     // Update the mass-spring-system using the Midpoint method.
     //
     {
-       std::cout << ball->center_of_mass << std::endl;
-
         Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
         Vec3 temp_velocities[MAX_MASSPOINTS]; // v(t + h/2)
         float dt_2 = 0.5f * dt;

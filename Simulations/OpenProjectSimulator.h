@@ -169,15 +169,19 @@ public:
 	void setupBall();
 	
 	void setup_game();
+	void game_logic(float dt);
 	void update_game(float dt);
 	void draw_game();
 
 	void debug_print();
 
 private:
-    Rigid_Body & query_rigid_body(int index);
-    Rigid_Body & create_and_query_rigid_body(Vec3 size, Real mass);
+    Rigid_Body * query_rigid_body(int index);
+    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass);
 
+    Spring * query_spring(int index);
+    Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
+    
     //
 	// :TimeStep
 	// Since this is supposed to be a game, we definitely want the simulation to run
@@ -210,23 +214,16 @@ private:
 	//
 	Rigid_Body rigid_bodies[MAX_RIGID_BODIES];
 	int rigid_body_count;
-
-	Rigid_Body normal_walls[2];
-
-	Rigid_Body goals[2];
-
+    
+	Rigid_Body * normal_walls[2];
+	Rigid_Body * goals[2];
+	Rigid_Body * ball;
+	
 	Player_Racket player_rackets[2];
+    
 	//
 	// Heat Diffusion.
 	//
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
-
-	Rigid_Body* ball;
-	int ballIndex;
-
-	bool random(int rng) {
-		return (std::uniform_int_distribution<int>{}(rng)) & 1;
-	}
-
 };
