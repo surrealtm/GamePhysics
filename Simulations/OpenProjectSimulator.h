@@ -131,7 +131,7 @@ struct Heat_Grid {
 	void randomize();
 	void set(int x, int y, float value);
 	float get(int x, int y);
-	float* get_cell_to_worldpos(int world_x, int world_y);
+	float* get_cell_to_worldpos(float world_x, float world_y);
 };
 
 //

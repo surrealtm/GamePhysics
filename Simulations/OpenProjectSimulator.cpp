@@ -321,10 +321,10 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
-float* Heat_Grid::get_cell_to_worldpos(int world_x, int world_y)
+float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 {
-    int grid_x = world_x / scale;
-    int grid_y = world_y / scale;
+    int grid_x = (world_x + scale/2) / scale;
+    int grid_y = (world_y + scale/2) / scale;
 
     return values + grid_y * width + grid_x;
 }
