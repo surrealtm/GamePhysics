@@ -500,7 +500,7 @@ void OpenProjectSimulator::setup_demo_scene() {
             ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
         
-        this->gravity = -10;
+        this->gravity = 0;
     }
     
     //
@@ -578,11 +578,11 @@ void OpenProjectSimulator::setupBall()
 }
 
 void OpenProjectSimulator::setup_game() {
+    this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
-    
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
