@@ -73,7 +73,7 @@ struct Rigid_Body {
 	
 	Vec3 frame_force;
 	Vec3 linear_velocity;
-	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis.
+	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis. @Cleanup: This does not seem to work apparently?
 
 	Vec3 frame_torque;
 	Vec3 angular_velocity; 
@@ -82,9 +82,10 @@ struct Rigid_Body {
 	
 	Vec3 albedo;
 
+    Real restitution;
 	bool is_trigger;
 
-	void create(Vec3 size, Real mass, bool is_trigger);
+	void create(Vec3 size, Real mass, Real restitution, bool is_trigger);
 	void warp(Vec3 center, Quat orientation);
 	void build_transformation_matrix();
     void build_inertia_tensor();
@@ -174,7 +175,7 @@ public:
 
 	int create_masspoint(Vec3 position, Real mass);
 	int create_spring(int a, int b, Real initial_length, Real stiffness);
-	int create_rigid_body(Vec3 size, Real mass, bool is_trigger);
+	int create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
@@ -197,7 +198,7 @@ public:
 
 private:
     Rigid_Body * query_rigid_body(int index);
-    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger);
+    Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
