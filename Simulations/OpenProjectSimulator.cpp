@@ -616,7 +616,7 @@ void OpenProjectSimulator::setupBall()
     this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, 1, false);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
-    this->ball->set_angular_factor(Vec3(1, 1, 0));
+    this->ball->set_angular_factor(Vec3(0, 0, 1));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
@@ -630,12 +630,21 @@ void OpenProjectSimulator::set_default_camera_position() {
     }
 }
 
+void OpenProjectSimulator::setupPoints() {
+
+}
+
+void OpenProjectSimulator::spawnPoint(int player) {
+
+}
+
 void OpenProjectSimulator::setup_game() {
     this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+    setupPoints();
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.

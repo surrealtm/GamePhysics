@@ -10,7 +10,7 @@
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
-#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
+#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets to the front
 #define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to walls
 
 #define PRINT_FIXED_FLOAT "%2.05f"
@@ -188,6 +188,8 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
+	void setupPoints();
+	void spawnPoint(int player);
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -244,9 +246,11 @@ private:
 
 	std::vector<Trigger_Collision> trigger_collisions;
 
-	Rigid_Body * normal_walls[2];
-	Rigid_Body * goals[2];
-	Rigid_Body * ball;
+	Rigid_Body* normal_walls[2];
+	Rigid_Body* goals[2];
+	Rigid_Body* ball;
+	Rigid_Body* points1[11];
+	Rigid_Body* points2[11];
 	
 	Player_Racket player_rackets[2];
     
