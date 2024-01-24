@@ -487,7 +487,7 @@ void OpenProjectSimulator::setup_demo_scene() {
             ball->apply_angular_impulse(Vec3(1, 1, 1));
         }
         
-        this->gravity = -10;
+        this->gravity = 0;
     }
     
     //
@@ -559,17 +559,17 @@ void OpenProjectSimulator::setupBall()
     float ballMass = 1.0f;
 
     ball = rigid_bodies + create_rigid_body(Vec3(ballScale), ballMass);
-    ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, -0.75), Quat(0, 0, 0, 1));
+    ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
 
 void OpenProjectSimulator::setup_game() {
+    this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
-    
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
