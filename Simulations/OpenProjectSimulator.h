@@ -73,10 +73,12 @@ struct Rigid_Body {
 	
 	Vec3 frame_force;
 	Vec3 linear_velocity;
-	
+	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis.
+
 	Vec3 frame_torque;
 	Vec3 angular_velocity; 
 	Vec3 angular_momentum;
+	Vec3 angular_factor; // See linear_factor
 	
 	Vec3 albedo;
 
@@ -92,6 +94,8 @@ struct Rigid_Body {
 	void apply_angular_impulse(Vec3 impulse);
     void apply_torque(Vec3 torque);
     
+	void set_linear_factor(Vec3 factor);
+
 	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
 };
 

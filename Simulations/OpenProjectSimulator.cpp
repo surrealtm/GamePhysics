@@ -170,9 +170,11 @@ SAT_Input sat_input(Rigid_Body & body) {
 void Rigid_Body::create(Vec3 size, Real mass, bool is_trigger) {
     assert(mass >= 0.f && "Invalid Mass for Rigid Body.");
 
-	this->size = size;
-	this->inverse_mass = mass > 0.0 ? 1.0 / mass : 0.0;
-    this->is_trigger = is_trigger;
+	this->size           = size;
+	this->inverse_mass   = mass > 0.0 ? 1.0 / mass : 0.0;
+    this->is_trigger     = is_trigger;
+    this->linear_factor  = Vec3(1, 1, 1);
+    this->angular_factor = Vec3(1, 1, 1);
 
 	if(mass > 0) {
         Real lx = this->size.x, ly = this->size.y, lz = this->size.z; // The size vector is already in full extends.
@@ -230,8 +232,8 @@ void Rigid_Body::apply_force(Vec3 world_space_position, Vec3 force) {
 void Rigid_Body::apply_impulse(Vec3 world_space_position, Vec3 impulse) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
-	this->linear_velocity  += impulse * this->inverse_mass;
-	this->angular_momentum += cross(position_relative_to_center, impulse);
+	this->linear_velocity  += impulse * this->linear_factor * this->inverse_mass;
+	this->angular_momentum += cross(position_relative_to_center, impulse) * this->angular_factor;
 }
 
 void Rigid_Body::apply_angular_impulse(Vec3 impulse) {
@@ -959,6 +961,7 @@ void OpenProjectSimulator::update_game(float dt) {
 
             body.center_of_mass   = body.center_of_mass  + body.linear_velocity * dt; // Integrate the position
             body.linear_velocity  = body.linear_velocity + body.frame_force * body.inverse_mass * dt; // Integrate the velocity.
+            body.linear_velocity *= body.linear_factor;
 
             // Reset the accumulators every frame.
             body.frame_force = { 0 };
@@ -968,7 +971,8 @@ void OpenProjectSimulator::update_game(float dt) {
             //
 
             // Integrate the angular momentum
-            body.angular_momentum = body.angular_momentum + dt * body.frame_torque;
+            body.angular_momentum  = body.angular_momentum + dt * body.frame_torque;
+            body.angular_momentum *= body.angular_factor;
             
             // Calculate the new inertia tensor
             body.build_inertia_tensor();
@@ -991,7 +995,7 @@ void OpenProjectSimulator::update_game(float dt) {
         }
     }
 
-    this->debug_print();
+    //this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {
