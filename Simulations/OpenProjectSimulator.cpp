@@ -553,11 +553,11 @@ void OpenProjectSimulator::setupWalls()
 
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
-    float heightPos = heat_grid.height * heat_grid.scale / 2;
+    float heightPos = goals[0]->center_of_mass.y;
     // Player 1
     {
         player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
-        player_rackets[0].platform->warp(Vec3(0, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+        player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = create_masspoint(Vec3(goals[0]->center_of_mass.x + goals[0]->size.x / 2, goals[0]->center_of_mass.y, goals[0]->center_of_mass.z), 0);
         int m2 = create_masspoint(Vec3(player_rackets[0].platform->center_of_mass.x - player_rackets[0].platform->size.x / 2, player_rackets[0].platform->center_of_mass.y, player_rackets[0].platform->center_of_mass.z) , 1);
@@ -567,7 +567,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     // Player 2
     {
         player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, false);
-        player_rackets[1].platform->warp(Vec3(heat_grid.width - 1, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+        player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2, goals[1]->center_of_mass.y, goals[1]->center_of_mass.z), 0);
         int m2 = this->create_masspoint(Vec3(player_rackets[1].platform->center_of_mass.x + player_rackets[1].platform->size.x / 2, player_rackets[1].platform->center_of_mass.y, player_rackets[1].platform->center_of_mass.z), 1);
@@ -588,7 +588,7 @@ void OpenProjectSimulator::setupBall()
     float ballMass = 1.0f;
 
     this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, false);
-    this->ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(1, 1, 0));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
