@@ -417,23 +417,7 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, bool is_trigge
     return index;
 }
 
-Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
-    assert(index >= 0 && index < this->rigid_body_count);
-    return &this->rigid_bodies[index];
-}
 
-Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
-    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
-}
-
-Spring * OpenProjectSimulator::query_spring(int index) {
-    assert(index >= 0 && index < this->spring_count);
-    return &this->springs[index];    
-}
-
-Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
-    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
-}
 
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
     assert(index >= 0 && index < this->masspoint_count);
@@ -454,6 +438,34 @@ void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orient
     assert(index >= 0 && index < this->rigid_body_count);
     this->rigid_bodies[index].warp(position, orientation);
 }
+
+
+Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    return &this->rigid_bodies[index];
+}
+
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, bool is_trigger) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass, is_trigger));
+}
+
+Spring * OpenProjectSimulator::query_spring(int index) {
+    assert(index >= 0 && index < this->spring_count);
+    return &this->springs[index];    
+}
+
+Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
+    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
+}
+
+bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
+    for(Trigger_Collision & collision : this->trigger_collisions) {
+        if(collision.trigger == trigger && collision.other == other) return true;
+    }
+
+    return false;
+}
+
 
 void OpenProjectSimulator::setup_demo_scene() {
     //
@@ -584,8 +596,20 @@ void OpenProjectSimulator::setup_game() {
 
 void OpenProjectSimulator::game_logic(float dt) {
     //
-    // @Incomplete: Handle goals -> VICTOR
+    // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
+    // for the other player.
     //
+    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
+        // exists.
+        printf("Player one has scored!\n");
+    }
+
+    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
+        // exists.
+        printf("Player zero has scored!\n");
+    }
     
     //
     // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS

@@ -191,6 +191,8 @@ private:
 
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
+
+    bool trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other);
     
     //
 	// :TimeStep
