@@ -340,6 +340,14 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
+float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
+{
+    int grid_x = (world_x + scale/2) / scale;
+    int grid_y = (world_y + scale/2) / scale;
+
+    return values + grid_y * width + grid_x;
+}
+
 
 //
 // Simulator
@@ -647,7 +655,7 @@ void OpenProjectSimulator::setupBall()
     this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, 1, false);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
-    this->ball->set_angular_factor(Vec3(1, 1, 0));
+    this->ball->set_angular_factor(Vec3(0, 0, 1));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
@@ -666,6 +674,14 @@ void OpenProjectSimulator::set_default_camera_position() {
     }
 }
 
+void OpenProjectSimulator::setupPoints() {
+
+}
+
+void OpenProjectSimulator::spawnPoint(int player) {
+
+}
+
 void OpenProjectSimulator::setup_game() {
 #if USE_PHYSICS_TEST_SCENE
     this->setup_demo_scene();
@@ -677,6 +693,7 @@ void OpenProjectSimulator::setup_game() {
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+    setupPoints();
 #endif
 
     // 
@@ -706,10 +723,16 @@ void OpenProjectSimulator::update_game_logic(float dt) {
         // exists.
         printf("Player zero has scored!\n");
     }
+
+    //get current position of ball on grid
+    float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    // increase speed of ball depending on temperature
+    ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell;
     
-    //
-    // @Incomplete: Increase temperate of cell where the ball currently resides -> DENNIS
-    //
+    
+    // Increase temperate of cell where the ball currently is
+    // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
+    *temp_cell += heat_grid.heat_rise_by_ball;
 
     //
     // Move the player rackets depending on player input -> MANU
@@ -717,17 +740,68 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 
     if(DXUTIsKeyDown(VK_UP))
     {
-        this->player_rackets[1].platform->apply_impulse(player_rackets[1].platform->center_of_mass, Vec3(0, .1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, 1.5, 0));
+        
     }else if(DXUTIsKeyDown(VK_DOWN))
     {
-        this->player_rackets[1].platform->apply_impulse(player_rackets[1].platform->center_of_mass, Vec3(0, -.1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, -1.5, 0));
+    }else
+    {
+        
+        if(this->player_rackets[1].platform->linear_velocity.y > -0.05 && this->player_rackets[1].platform->linear_velocity.y < 0.05)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity.y -= 0.03;
+            
+        }else if(this->player_rackets[1].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[1].platform->linear_velocity.y += 0.03;
+           
+        }
+        
     }
     if(DXUTIsKeyDown('W'))
     {
-        this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, 0.1, 0));
-    } else if(DXUTIsKeyDown('S'))
+        if(this->player_rackets[0].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, 1.5, 0));
+    }else if(DXUTIsKeyDown(0x53))
     {
-        this->player_rackets[0].platform->apply_impulse(player_rackets[0].platform->center_of_mass, Vec3(0, -0.1, 0));
+        if(this->player_rackets[1].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
+        }
+        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, -1.5, 0));
+    }else
+    {
+        
+        if(this->player_rackets[0].platform->linear_velocity.y > -0.05 && this->player_rackets[0].platform->linear_velocity.y < 0.05)
+        {
+            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
+        }
+        if(this->player_rackets[0].platform->linear_velocity.y > 0)
+        {
+            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
+            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
+        }else if(this->player_rackets[0].platform->linear_velocity.y < 0)
+        {
+            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
+            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
+        }
+        
     }
     
     //
