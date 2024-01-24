@@ -569,7 +569,7 @@ void OpenProjectSimulator::setupWalls()
     normal_walls[1] = wallSouth;
     
     Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, false);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 1, 1, false);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -958,11 +958,18 @@ void OpenProjectSimulator::update_game(float dt) {
                     // numerical errors over time when stacked.
                     //
 
-                    Real total_mass = lhs.inverse_mass + rhs.inverse_mass;
-                    Real correction_factor = 0.1;
-                    Vec3 correction_vector = contact_normal * correction_factor;
-                    lhs.center_of_mass += correction_vector * lhs.inverse_mass / total_mass;
-                    rhs.center_of_mass -= correction_vector * rhs.inverse_mass / total_mass;
+                    {
+                        Real normal_magnitude = sqrt(contact_normal.x * contact_normal.x + contact_normal.y * contact_normal.y + contact_normal.z * contact_normal.z);
+                        Real lhs_factor = lhs.inverse_mass * abs(dot(contact_normal, lhs.linear_factor) / normal_magnitude);
+                        Real rhs_factor = rhs.inverse_mass * abs(dot(contact_normal, rhs.linear_factor) / normal_magnitude);
+
+                        if(lhs_factor + rhs_factor >= 0.0001) {
+                            Real correction_factor = 0.2 * result.depth;
+                            Vec3 correction_vector = contact_normal * correction_factor;
+                            lhs.center_of_mass += correction_vector * lhs_factor / (lhs_factor + rhs_factor);
+                            rhs.center_of_mass -= correction_vector * rhs_factor / (lhs_factor + rhs_factor);
+                        }
+                    }
 
                     //
                     // Do a proper collision response, by calculating the impulse between the two bodies,
