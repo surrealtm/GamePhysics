@@ -536,7 +536,12 @@ void OpenProjectSimulator::setupWalls()
     Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 100, false);
     Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 100, false);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    wallNorth->set_linear_factor(Vec3(0, 0, 0));
+    wallNorth->set_angular_factor(Vec3(0, 0, 0));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    wallSouth->set_linear_factor(Vec3(0, 0, 0));
+    wallSouth->set_angular_factor(Vec3(0, 0, 0));
+
 
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
@@ -544,7 +549,11 @@ void OpenProjectSimulator::setupWalls()
     Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 100, false);
     Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 100, false);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    goalLeft->set_linear_factor(Vec3(0, 0, 0));
+    goalRight->set_angular_factor(Vec3(0, 0, 0));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    goalLeft->set_linear_factor(Vec3(0, 0, 0));
+    goalLeft->set_angular_factor(Vec3(0, 0, 0));
 
     goals[0] = goalLeft;
     goals[1] = goalRight;
@@ -572,6 +581,11 @@ void OpenProjectSimulator::setupPlayerPlatforms()
         int m2 = this->create_masspoint(player_rackets[1].platform->center_of_mass, 1);
         player_rackets[1].spring = this->create_and_query_spring(m1, m2, 1, 1);
     }
+
+    for (auto racket : player_rackets) {
+		racket.platform->set_linear_factor(Vec3(1, 0, 0));
+        racket.platform->set_angular_factor(Vec3(0, 0, 0));
+	}
 }
 
 void OpenProjectSimulator::setupBall()
@@ -583,6 +597,8 @@ void OpenProjectSimulator::setupBall()
 
     this->ball = this->create_and_query_rigid_body(Vec3(ballScale), ballMass, false);
     this->ball->warp(Vec3((heatgrid_width - heat_grid.scale) / 2, (heatgrid_width - heat_grid.scale) / 2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    this->ball->set_linear_factor(Vec3(1, 1, 0));
+    this->ball->set_angular_factor(Vec3(1, 1, 0));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
     
 }
