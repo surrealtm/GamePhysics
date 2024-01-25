@@ -1321,6 +1321,12 @@ void OpenProjectSimulator::draw_game() {
             this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
+    /*for(Vec3 & point : this->debug_draw_points) {
+        Real sphere_radius = 0.05;
+        Real r = 1, g = 0, b = 0;
+        this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(r, g, b), 1, Vec3(r, g, b));
+        this->DUC->drawSphere(point, Vec3(sphere_radius, sphere_radius, sphere_radius));
+    }*/
 }
 
 void OpenProjectSimulator::debug_print() {
