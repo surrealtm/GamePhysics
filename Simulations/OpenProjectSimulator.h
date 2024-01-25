@@ -190,8 +190,6 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
-	void setupPoints();
-	void spawnPoint(int player);
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -251,8 +249,9 @@ private:
 	Rigid_Body* normal_walls[2];
 	Rigid_Body* goals[2];
 	Rigid_Body* ball;
-	Rigid_Body* points1[11];
-	Rigid_Body* points2[11];
+	int score1;
+	int score2;
+
 	float heat_accelleration_for_ball;
 
 	

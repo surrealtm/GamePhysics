@@ -280,11 +280,11 @@ void update(float fElapsedTime)
 	g_pEffectPositionNormalColor->SetProjection(g_camera.GetProjMatrix());
 }
 
-void setUpLighting(Vec3 EmissiveColor, Vec3 SpecularColor, float SpecularPower, Vec3 DiffuseColor)
+void setUpLighting(Vec3 EmissiveColor, Vec3 SpecularColor, float SpecularPower, Vec3 DiffuseColor, float alpha = 1)
 {
-	XMVECTOR c1 = EmissiveColor.toDirectXVector();
-	XMVECTOR c2 = SpecularColor.toDirectXVector();
-	XMVECTOR c3 = DiffuseColor.toDirectXVector();
+	XMVECTOR c1 = EmissiveColor.toDirectXVector(alpha);
+	XMVECTOR c2 = SpecularColor.toDirectXVector(alpha);
+	XMVECTOR c3 = DiffuseColor.toDirectXVector(alpha);
 	g_pEffectPositionNormal->SetEmissiveColor(c1);
 	g_pEffectPositionNormal->SetSpecularColor(c2);
 	g_pEffectPositionNormal->SetSpecularPower(SpecularPower);

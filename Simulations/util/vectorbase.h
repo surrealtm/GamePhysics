@@ -200,8 +200,8 @@ public:
     // Return the index of the minimal coordinate value.
     inline int minComponentId(void) const;
 	
-	inline DirectX::XMVECTOR toDirectXVector() const{
-	  return DirectX::XMVectorSet(x,y,z,1);
+	inline DirectX::XMVECTOR toDirectXVector(float alpha = 1) const{
+	  return DirectX::XMVectorSet(x,y,z,alpha);
   }
 
 	// zero element

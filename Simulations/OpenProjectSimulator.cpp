@@ -344,6 +344,8 @@ void TW_CALL tw_reset_button_callback(void *user_pointer) {
 OpenProjectSimulator::OpenProjectSimulator() {
     this->DUC = NULL;
     setup_timing();
+    score1 = 11;
+    score2 = 11;
 }
 
 const char * OpenProjectSimulator::getTestCasesStr() {
@@ -638,21 +640,12 @@ void OpenProjectSimulator::set_default_camera_position() {
     }
 }
 
-void OpenProjectSimulator::setupPoints() {
-
-}
-
-void OpenProjectSimulator::spawnPoint(int player) {
-
-}
-
 void OpenProjectSimulator::setup_game() {
     this->gravity = 0;
     setupHeatGrid();
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
-    setupPoints();
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
@@ -669,16 +662,27 @@ void OpenProjectSimulator::game_logic(float dt) {
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
     // for the other player.
     //
-    if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
+    if(this->trigger_collision_occurred(this->goals[1], this->ball)) {
         // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
         // exists.
+        score1++;
         printf("Player one has scored!\n");
     }
 
     if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
-        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
+        // Player two has scored. @Incomplete: Add the actual score value somewhere once the score value
         // exists.
+        score2++;
         printf("Player zero has scored!\n");
+    }
+
+    if (score1 >= 11) {
+        printf("Player one has won!\n");
+        //reset();
+    }
+    else if (score2 >= 11) {
+		printf("Player two has won!\n");
+        //reset();
     }
 
     //get current position of ball on grid
@@ -1224,6 +1228,43 @@ void OpenProjectSimulator::draw_game() {
             Rigid_Body & body = this->rigid_bodies[i];
             this->DUC->setUpLighting(Vec3(0, 0, 0), body.albedo, 0.2, body.albedo);
             this->DUC->drawRigidBody(body.transformation * this->DUC->g_camera.GetWorldMatrix());
+        }
+    }
+
+    //
+    // Draw current scores of both players.
+    //
+    int j{ 0 };
+    for (int i{ 0 }; i < score1; i++) {
+        if (i < 5) {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+            this->DUC->drawSphere(Vec3(-1.f + 0.7f * i, goals[1]->size.y + 3.f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+        }
+        else if (i < 10) {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+            this->DUC->drawSphere(Vec3(-1.f + 0.7f * j, goals[1]->size.y + 2.25f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            j++;
+        }
+        else {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+			this->DUC->drawSphere(Vec3(-1.f + 0.75f * j, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
+        }
+    }
+
+    j = 0;
+    for (int i{ 0 }; i < score2; i++) {
+        if (i < 5) {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * i - 2.f, goals[1]->size.y + 3.f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+        }
+        else if (i < 10) {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * j - 2.f, goals[1]->size.y + 2.25f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            j++;
+        }
+        else {
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
 }
