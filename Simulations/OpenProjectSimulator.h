@@ -23,6 +23,7 @@
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
+#define MAX_JOINTS        4
 
 //
 // Rigid body settings
@@ -84,7 +85,7 @@ struct Masspoint {
 	Real inverse_mass; // 0 means this masspoint is fixed in space.
 	Vec3 position;
 	Vec3 velocity;
-    Vec3 frame_force;
+    Vec3 frame_force; // Read only, stored for easier access when doing the Midpoint integration.
 };
 
 //
@@ -174,6 +175,19 @@ struct Heat_Grid {
 };
 
 //
+// Joint
+//
+
+struct Joint {
+	Masspoint *masspoint;
+	Rigid_Body *rigid_body;
+	Vec3 fixed_rigid_body_to_masspoint; // The local offset of the masspoint on the rigid body, as it ought to be. The true delta is tried to be as close to this as possible.
+
+    void create(Masspoint * masspoint, Rigid_Body * rigid_body);
+    void evaluate(float dt);
+};
+
+//
 // Simulator
 //
 
@@ -216,7 +230,8 @@ public:
 	int create_masspoint(Vec3 position, Real mass);
 	int create_spring(int a, int b, Real initial_length, Real stiffness);
 	int create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
-
+    int create_joint(Masspoint * masspoint, Rigid_Body * rigid_body);
+    
 	void apply_impulse_to_masspoint(int index, Vec3 impulse);
 	void apply_impulse_to_rigid_body(int index, Vec3 world_space_position, Vec3 impulse);
     void apply_torque_to_rigid_body(int index, Vec3 torque);
@@ -250,6 +265,9 @@ private:
 
     Masspoint * query_masspoint(int index);
     Masspoint * create_and_query_masspoint(Vec3 position, Real mass);
+
+    Joint * query_joint(int index);
+    Joint * create_and_query_joint(Masspoint * masspoint, Rigid_Body * rigid_body);
     
     void calculate_masspoint_forces();
 	void calculate_masspoint_positions(float dt);
@@ -277,6 +295,7 @@ private:
 	//
 	TwBar *tweak_bar;
 	DrawRequest draw_requests;
+	std::vector<Vec3> debug_draw_points; // Debug: Can be used to draw anything in immediate mode.
 	float gravity;
 
 	//
@@ -295,7 +314,20 @@ private:
 	int rigid_body_count;
 
 	std::vector<Trigger_Collision> trigger_collisions;
-	std::vector<Vec3> debug_draw_points; // Debug: Can be used to draw anything in immediate mode.
+	
+	//
+	// :ThingsToImprove
+	// To whom it might concern:
+	// I think it would be cleaner to not store the normal_walls pointer here (since we don't actually
+	// need them, just the coordinates which should be constants anyway).
+	// We should also probably have one big Player struct, which owns not only the racket, but also the
+	// score and the goal (and maybe the goal time stamp, for whatever that is required). That way, we'd
+	// have less cluttering here, and less indices to worry about.
+	// Lastly, I'm not entirely sure why the heat_accelleration_for_ball (is that even spelled correctly?)
+	// is stored here, seems that should also be a constant, applied once per frame to the rigid body...
+	// 
+	//   - vmat, 28.01.24
+	//
 
 	Rigid_Body* normal_walls[2];
 	Rigid_Body* goals[2];
@@ -314,4 +346,10 @@ private:
 	//
 	Heat_Grid heat_grid;
 	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
+
+    //
+    // Joints.
+    //
+    Joint joints[MAX_JOINTS];
+    int joint_count;
 };

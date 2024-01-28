@@ -356,6 +356,21 @@ float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 
 
 //
+// Joint
+//
+
+void Joint::create(Masspoint * masspoint, Rigid_Body * rigid_body) {
+    this->masspoint = masspoint;
+    this->rigid_body = rigid_body;
+    this->fixed_rigid_body_to_masspoint = masspoint->position - rigid_body->center_of_mass;
+}
+
+void Joint::evaluate(float dt) {
+    rigid_body->apply_force(masspoint->position, masspoint->frame_force);
+}
+
+
+//
 // Simulator
 //
 
@@ -401,10 +416,12 @@ void OpenProjectSimulator::reset() {
     this->masspoint_count = 0;
     this->spring_count    = 0;
     this->spring_damping  = 0.0f; // No damping
-
+    
     this->rigid_body_count = 0;
     
     this->heat_alpha = 0.8f; // Half decay.
+
+    this->joint_count = 0;
     
     this->setup_game();    
 }
@@ -507,6 +524,17 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restituti
     return index;
 }
 
+int OpenProjectSimulator::create_joint(Masspoint * masspoint, Rigid_Body * rigid_body) {
+    assert(this->joint_count < MAX_JOINTS);
+    int index = this->joint_count;
+
+    Joint & joint = this->joints[index];
+    joint.create(masspoint, rigid_body);
+    
+    ++this->joint_count;
+    return index;
+}
+
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
     assert(index >= 0 && index < this->masspoint_count);
     this->masspoints[index].velocity += impulse;
@@ -576,11 +604,16 @@ void OpenProjectSimulator::setup_joint_test() {
     Vec3 body_position = Vec3(0, 5, 0);
     
     Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
+    body->warp(body_position, Quat(0, 0, 0, 1));
 
     int body_masspoint_index = this->create_masspoint(body_position, 1);
     int base_masspoint_index = this->create_masspoint(Vec3(0, 10, 0), 0);
+
+    Masspoint * body_masspoint = this->query_masspoint(body_masspoint_index);
     
     Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 2.5, 40);
+
+    this->create_joint(body_masspoint, body);
 }
 
 void OpenProjectSimulator::setupHeatGrid()
@@ -1123,6 +1156,14 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
         }
     }
 
+    //
+    // Finally update all joints. Note that the joins require information about the Masspoint's frame_force.
+    //
+    for(int i = 0; i < this->joint_count; ++i) {
+        Joint & joint = this->joints[i];
+        joint.evaluate(dt);
+    }
+    
     //    this->debug_print();
 }
 
@@ -1331,6 +1372,15 @@ Masspoint * OpenProjectSimulator::create_and_query_masspoint(Vec3 position, Real
     return this->query_masspoint(this->create_masspoint(position, mass));
 }
 
+Joint * OpenProjectSimulator::query_joint(int index) {
+    assert(index >= 0 && index < this->joint_count);
+    return &this->joints[index];
+}
+
+Joint * OpenProjectSimulator::create_and_query_joint(Masspoint * masspoint, Rigid_Body *rigid_body) {
+    return this->query_joint(this->create_joint(masspoint, rigid_body));
+}
+
 void OpenProjectSimulator::calculate_masspoint_forces() {
     // Gravity force.
     for(int i = 0; i < this->masspoint_count; ++i) {
@@ -1385,7 +1435,6 @@ void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
         if(masspoint.inverse_mass == 0.) continue;
         
         masspoint.velocity += dt * masspoint.inverse_mass * masspoint.frame_force;
-        masspoint.frame_force = Vec3(0, 0, 0);
     }
 }
 
