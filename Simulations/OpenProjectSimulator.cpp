@@ -146,6 +146,23 @@ SAT_Input sat_input(Rigid_Body & body) {
 
 
 //
+// Mass Spring System.
+//
+
+void Masspoint::create(Vec3 position, Real mass) {
+    this->inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
+    this->position     = position;
+    this->velocity     = Vec3(0, 0, 0);
+    this->frame_force  = Vec3(0, 0, 0);
+    this->_internal_force = Vec3(0, 0, 0);
+}
+
+void Masspoint::apply_force(Vec3 force) {
+    this->frame_force += force;
+}
+
+
+//
 // Rigid Bodies.
 //
 
@@ -362,11 +379,13 @@ float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 void Joint::create(Masspoint * masspoint, Rigid_Body * rigid_body) {
     this->masspoint = masspoint;
     this->rigid_body = rigid_body;
-    this->fixed_rigid_body_to_masspoint = masspoint->position - rigid_body->center_of_mass;
+    this->fixed_rigid_body_to_masspoint = this->masspoint->position - this->rigid_body->center_of_mass;
 }
 
 void Joint::evaluate(float dt) {
-    rigid_body->apply_force(masspoint->position, masspoint->frame_force);
+    Vec3 delta_to_fixed = this->masspoint->position - (this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint); // The "error" between where the ideal joint position is, and where the masspoint currently is in space.
+    this->rigid_body->apply_impulse(masspoint->position, delta_to_fixed);
+    //    this->masspoint->apply_force(this->rigid_body->get_world_space_velocity_at(this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint) - delta_to_fixed);
 }
 
 
@@ -487,10 +506,7 @@ int OpenProjectSimulator::create_masspoint(Vec3 position, Real mass) {
     int index = this->masspoint_count;
 
     Masspoint & m  = this->masspoints[index];
-    m.position     = position;
-    m.velocity     = Vec3(0, 0, 0);
-    m.inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
-    m.frame_force  = Vec3(0, 0, 0);
+    m.create(position, mass);
     
     ++this->masspoint_count;
     return index;
@@ -522,7 +538,7 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restituti
     
     ++this->rigid_body_count;
     return index;
-}
+}
 
 int OpenProjectSimulator::create_joint(Masspoint * masspoint, Rigid_Body * rigid_body) {
     assert(this->joint_count < MAX_JOINTS);
@@ -601,19 +617,22 @@ void OpenProjectSimulator::setup_rigid_body_test() {
 }
 
 void OpenProjectSimulator::setup_joint_test() {
-    Vec3 body_position = Vec3(0, 5, 0);
+    Vec3 body_position = Vec3(0, 0, 0);
+    Vec3 fixed_position = Vec3(0, 5, 0);
     
     Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
-    body->warp(body_position, Quat(0, 0, 0, 1));
+    body->warp(body_position - Vec3(0, body->size.y / 2, 0), Quat(0, 0, 0, 1));
 
     int body_masspoint_index = this->create_masspoint(body_position, 1);
-    int base_masspoint_index = this->create_masspoint(Vec3(0, 10, 0), 0);
+    int base_masspoint_index = this->create_masspoint(fixed_position, 0);
 
     Masspoint * body_masspoint = this->query_masspoint(body_masspoint_index);
     
     Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 2.5, 40);
 
     this->create_joint(body_masspoint, body);
+
+    //    body->apply_impulse(body->center_of_mass, Vec3(0, 1, 0));
 }
 
 void OpenProjectSimulator::setupHeatGrid()
@@ -718,7 +737,7 @@ void OpenProjectSimulator::setup_game() {
     this->gravity = -10;
 #elif ACTIVE_SCENE == JOINT_TEST_SCENE
     this->setup_joint_test();
-    this->gravity = -10;
+    this->gravity = 0;
 #endif
 
     // 
@@ -840,6 +859,8 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
 
         for(int i = 0; i < this->masspoint_count; ++i) {
             Masspoint & masspoint = this->masspoints[i];
+            if(masspoint.inverse_mass > 0.) masspoint.apply_force(Vec3(0, this->gravity, 0)); // Apply gravity.
+            
             previous_positions[i] = masspoint.position;
             previous_velocities[i] = masspoint.velocity;
         }
@@ -856,8 +877,14 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
         // Calculate v(t + h) based on a(t).
         for(int i = 0; i < this->masspoint_count; ++i) this->masspoints[i].velocity = previous_velocities[i];
         this->calculate_masspoint_velocities(dt);
-    }
 
+        // Reset the frame forces.
+        for(int i = 0; i < this->masspoint_count; ++i) {
+            Masspoint & masspoint = this->masspoints[i];
+            masspoint.frame_force = Vec3(0.);
+        }
+    }
+        
     //
     // Update the heat grid using the implicit method.
     //
@@ -1157,7 +1184,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
     }
 
     //
-    // Finally update all joints. Note that the joins require information about the Masspoint's frame_force.
+    // Finally update all joints.
     //
     for(int i = 0; i < this->joint_count; ++i) {
         Joint & joint = this->joints[i];
@@ -1382,12 +1409,12 @@ Joint * OpenProjectSimulator::create_and_query_joint(Masspoint * masspoint, Rigi
 }
 
 void OpenProjectSimulator::calculate_masspoint_forces() {
-    // Gravity force.
+    // External forces.
     for(int i = 0; i < this->masspoint_count; ++i) {
         Masspoint & masspoint = this->masspoints[i];
         if(masspoint.inverse_mass == 0.) continue;
 
-        masspoint.frame_force = Vec3(0, this->gravity, 0);
+        masspoint._internal_force = masspoint.frame_force;
     }
     
     // Spring forces.
@@ -1407,8 +1434,8 @@ void OpenProjectSimulator::calculate_masspoint_forces() {
 
         Real total_mass = a.inverse_mass + b.inverse_mass;
             
-        a.frame_force += (a.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
-        b.frame_force -= (b.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+        a._internal_force += (a.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+        b._internal_force -= (b.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
     }
 
     // Damping force.
@@ -1416,7 +1443,7 @@ void OpenProjectSimulator::calculate_masspoint_forces() {
         Masspoint & masspoint = this->masspoints[i];
         if(masspoint.inverse_mass == 0.) continue;
 
-        masspoint.frame_force -= masspoint.velocity * this->spring_damping;
+        masspoint._internal_force -= masspoint.velocity * this->spring_damping;
     }    
 }
 
@@ -1434,7 +1461,8 @@ void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
         Masspoint & masspoint = this->masspoints[i];
         if(masspoint.inverse_mass == 0.) continue;
         
-        masspoint.velocity += dt * masspoint.inverse_mass * masspoint.frame_force;
+        masspoint.velocity += dt * masspoint.inverse_mass * masspoint._internal_force;
+        masspoint._internal_force = Vec3(0.0);
     }
 }
 

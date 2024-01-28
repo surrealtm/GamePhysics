@@ -85,7 +85,11 @@ struct Masspoint {
 	Real inverse_mass; // 0 means this masspoint is fixed in space.
 	Vec3 position;
 	Vec3 velocity;
-    Vec3 frame_force; // Read only, stored for easier access when doing the Midpoint integration.
+    Vec3 frame_force; // External forces applied on this masspoint.
+    Vec3 _internal_force; // Read only, stored for easier access when doing the Midpoint integration.
+
+    void create(Vec3 position, Real mass);
+    void apply_force(Vec3 force);
 };
 
 //
