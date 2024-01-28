@@ -257,8 +257,14 @@ void Rigid_Body::maybe_sleep(float dt) {
 }
 
 void Rigid_Body::maybe_awake() {
-    return;
-    if(dot(this->linear_velocity, this->linear_velocity) > RIGID_BODY_SLEEP_THRESHOLD || dot(this->angular_velocity, this->angular_velocity) > RIGID_BODY_SLEEP_THRESHOLD)
+    //
+    // If any of these members are above a certain threshold, the rigid body should move.
+    // It means that there is enough movement to represent the results visually.
+    //
+    if(dot(this->linear_velocity,  this->linear_velocity)  > RIGID_BODY_SLEEP_THRESHOLD ||
+       dot(this->frame_force,      this->frame_force)      > RIGID_BODY_SLEEP_THRESHOLD ||
+       dot(this->frame_torque,     this->frame_torque)     > RIGID_BODY_SLEEP_THRESHOLD ||
+       dot(this->angular_velocity, this->angular_velocity) > RIGID_BODY_SLEEP_THRESHOLD)
         this->awake();
 }
 
@@ -362,8 +368,6 @@ void TW_CALL tw_reset_button_callback(void *user_pointer) {
 OpenProjectSimulator::OpenProjectSimulator() {
     this->DUC = NULL;
     setup_timing();
-    score1 = 11;
-    score2 = 11;
 }
 
 const char * OpenProjectSimulator::getTestCasesStr() {
@@ -396,7 +400,7 @@ void OpenProjectSimulator::reset() {
 
     this->rigid_body_count = 0;
     
-    this->heat_alpha = 0.5f; // Half decay.
+    this->heat_alpha = 0.8f; // Half decay.
     
     this->setup_game();    
 }
@@ -441,7 +445,7 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
     }
 #else
     this->update_game_logic(timestep);
-this->update_physics_engine(timestep);
+    this->update_physics_engine(timestep);
 #endif
 }
 
@@ -533,6 +537,26 @@ Spring * OpenProjectSimulator::query_spring(int index) {
 
 Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
     return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
+}
+
+void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
+    //
+    // Apply a friction force to the racket to stop it from moving.
+    //
+    racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -racket->platform->linear_velocity.y, 0));
+    
+    //
+    // Apply a movement force when the player has pressed the respective keys to do so.
+    //
+    const float speed = 5.f; // This is in meters / second
+
+    if(DXUTIsKeyDown(key_up)) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
+    }
+
+    if(DXUTIsKeyDown(key_down)) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
+    }
 }
 
 bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
@@ -679,13 +703,14 @@ void OpenProjectSimulator::setup_game() {
 #if USE_PHYSICS_TEST_SCENE
     this->setup_demo_scene();
     this->gravity = -10;
-    this->running = false;
 #else
+    this->setupHeatGrid();
+    this->setupWalls();
+    this->setupPlayerPlatforms();
+    this->setupBall();
     this->gravity = 0;
-    setupHeatGrid();
-    setupWalls();
-    setupPlayerPlatforms();
-    setupBall();
+    this->score1 = 0;
+    this->score2 = 0;
 #endif
 
     // 
@@ -700,6 +725,10 @@ void OpenProjectSimulator::setup_game() {
 //
 
 void OpenProjectSimulator::update_game_logic(float dt) {
+#if USE_PHYSICS_TEST_SCENE 
+    return; // All the pointers and stuff aren't set up for the test scene.
+#endif
+
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
     // for the other player.
@@ -730,18 +759,37 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     //get current position of ball on grid
     float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
     // increase speed of ball depending on temperature
-    ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell;
+    //ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell; // nocheckin
     
     
     // Increase temperate of cell where the ball currently is
     // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
-    *temp_cell += heat_grid.heat_rise_by_ball;
 
+    // Each frame, we want to take out as much energy as we add, so that the total "energy count" remains
+    // the frame.
+    const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
+    
+    for(int i = 0; i < this->heat_grid.width; ++i) {
+        for(int j = 0; j < this->heat_grid.height; ++j) {
+            float value = this->heat_grid.get(i, j);
+            if(value > 0.0f) value -= decrease;
+            this->heat_grid.set(i, j, value);
+        }
+    }
+
+    this->heat_grid.apply_boundary_condition();
+    *temp_cell += heat_grid.heat_rise_by_ball;
+    
     //
     // Move the player rackets depending on player input -> MANU
     //
 
-    if(DXUTIsKeyDown(VK_UP))
+    this->move_player_racket(&this->player_rackets[0], VK_UP, VK_DOWN);
+    this->move_player_racket(&this->player_rackets[1], 'W', 'S');
+
+    /*
+// nocheckin
+      if(DXUTIsKeyDown(VK_UP))
     {
         if(this->player_rackets[1].platform->linear_velocity.y < 0)
         {
@@ -806,6 +854,7 @@ void OpenProjectSimulator::update_game_logic(float dt) {
         }
         
     }
+    */
     
     //
     // @Incomplete: Speed up or slow down the ball depending on the current
@@ -813,7 +862,7 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     //
 }
 
-void OpenProjectSimulator::update_physics_engine(float dt) {
+void OpenProjectSimulator::update_physics_engine(float dt) {    
     //
     // Update the mass-spring-system using the Midpoint method.
     //
@@ -1090,7 +1139,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
                     Vec3 relative_velocity = contact_point_velocity_lhs - contact_point_velocity_rhs;
                     Real rv_dot_normal = dot(relative_velocity, contact_normal);
 
-                    if(rv_dot_normal > 0.0) return; // Points are already separating.
+                    if(rv_dot_normal > 0.0) continue; // Points are already separating.
 
                     //
                     // Do a proper collision response, by calculating the impulse between the two bodies,
@@ -1207,7 +1256,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
         }
     }
 
-    //this->debug_print();
+    //    this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {

@@ -11,7 +11,7 @@
 #define MAX_RIGID_BODIES 16
 
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets to the front
-#define USE_PHYSICS_TEST_SCENE false // nocheckin
+#define USE_PHYSICS_TEST_SCENE false
 #define RIGID_BODY_POSITION_ERROR_CORRECTION true
 #define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
 
@@ -136,7 +136,7 @@ struct Heat_Grid {
 	int width = 0, height = 0;
 	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
-	float heat_rise_by_ball = 1.0f;
+	float heat_rise_by_ball = 0.005f;
 	
 	void create(int width, int height);
 	void destroy();
@@ -218,6 +218,7 @@ private:
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
 
+	void move_player_racket(Player_Racket * racket, int key_up, int key_down);
     bool trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other);
     
     //
