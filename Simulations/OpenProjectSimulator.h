@@ -2,22 +2,43 @@
 
 #include "Simulator.h"
 
+//
+// Time step
+//
 #define SIMULATOR_UPDATES_PER_SECOND 100
 #define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
 #define USE_FIXED_DT true // :TimeStep
 
+//
+// Test scenes
+//
+#define GAME_SCENE            0x1
+#define RIGID_BODY_TEST_SCENE 0x2
+#define JOINT_TEST_SCENE      0x3
+#define ACTIVE_SCENE JOINT_TEST_SCENE
+
+//
+// Simulation limits
+//
 #define MAX_MASSPOINTS   32
 #define MAX_SPRINGS      16
 #define MAX_RIGID_BODIES 16
 
-#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets to the front
-#define USE_PHYSICS_TEST_SCENE false
+//
+// Rigid body settings
+//
 #define RIGID_BODY_POSITION_ERROR_CORRECTION false
 #define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
 
+//
+// Offset constants
+//
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
 #define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to walls
 
+//
+// Print helpers
+//
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
 
@@ -60,6 +81,7 @@ struct Masspoint {
 	Real inverse_mass; // 0 means this masspoint is fixed in space.
 	Vec3 position;
 	Vec3 velocity;
+    Vec3 frame_force;
 };
 
 //
@@ -197,7 +219,8 @@ public:
     void apply_torque_to_rigid_body(int index, Vec3 torque);
 	void warp_rigid_body(int index, Vec3 position, Quat orientation);
 
-	void setup_demo_scene(); // Fuck you dennis.
+	void setup_rigid_body_test(); // Fuck you dennis.
+    void setup_joint_test();
 	void setupHeatGrid();
 	void setupWalls();
 	void setupPlayerPlatforms();
@@ -212,11 +235,20 @@ public:
 	void debug_print();
 
 private:
+	// @Cleanup: Correct order of all these methods...
+
     Rigid_Body * query_rigid_body(int index);
     Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
     Spring * query_spring(int index);
     Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
+
+    Masspoint * query_masspoint(int index);
+    Masspoint * create_and_query_masspoint(Vec3 position, Real mass);
+    
+    void calculate_masspoint_forces();
+	void calculate_masspoint_positions(float dt);
+	void calculate_masspoint_velocities(float dt);
 
 	void move_player_racket(Player_Racket * racket, int key_up, int key_down);
     bool trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other);

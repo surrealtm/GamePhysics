@@ -465,7 +465,8 @@ int OpenProjectSimulator::create_masspoint(Vec3 position, Real mass) {
     m.position     = position;
     m.velocity     = Vec3(0, 0, 0);
     m.inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
-
+    m.frame_force  = Vec3(0, 0, 0);
+    
     ++this->masspoint_count;
     return index;
 }
@@ -539,6 +540,64 @@ Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initia
     return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
 }
 
+void OpenProjectSimulator::calculate_masspoint_forces() {
+    // Gravity force.
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+
+        masspoint.frame_force = Vec3(0, this->gravity, 0);
+    }
+    
+    // Spring forces.
+    for(int i = 0; i < this->spring_count; ++i) {
+        Spring & spring = this->springs[i];
+        Masspoint & a = this->masspoints[spring.a], & b = this->masspoints[spring.b];
+
+        if(a.inverse_mass == 0. && b.inverse_mass == 0.) continue;
+            
+        // Calculate a(t) for all springs, based on x(t) and v(t) of a, b
+
+        Vec3 delta = a.position - b.position;
+        spring.current_length = norm(delta);
+        spring.current_force_from_a_to_b = -spring.stiffness * (spring.current_length - spring.initial_length) * (delta / spring.current_length);
+
+        // Calculate v(t + h/2) based on the spring forces for all masspoints
+
+        Real total_mass = a.inverse_mass + b.inverse_mass;
+            
+        a.frame_force += (a.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+        b.frame_force -= (b.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+    }
+
+    // Damping force.
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+
+        masspoint.frame_force -= masspoint.velocity * this->spring_damping;
+    }    
+}
+
+void OpenProjectSimulator::calculate_masspoint_positions(float dt) {
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+        
+        masspoint.position += dt * masspoint.velocity;
+    }
+}
+
+void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+        
+        masspoint.velocity += dt * masspoint.inverse_mass * masspoint.frame_force;
+        masspoint.frame_force = Vec3(0, 0, 0);
+    }
+}
+
 void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
     //
     // Apply a friction force to the racket to stop it from moving.
@@ -568,7 +627,7 @@ bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigi
 }
 
 
-void OpenProjectSimulator::setup_demo_scene() {
+void OpenProjectSimulator::setup_rigid_body_test() {
     //
     // Set up the springs.
     //
@@ -610,6 +669,17 @@ void OpenProjectSimulator::setup_demo_scene() {
         this->heat_grid.create(16, 16);
         this->heat_grid.randomize();
     }
+}
+
+void OpenProjectSimulator::setup_joint_test() {
+    Vec3 body_position = Vec3(0, 5, 0);
+    
+    Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
+
+    int body_masspoint_index = this->create_masspoint(body_position, 1);
+    int base_masspoint_index = this->create_masspoint(Vec3(0, 10, 0), 0);
+    
+    Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 2.5, 40);
 }
 
 void OpenProjectSimulator::setupHeatGrid()
@@ -687,23 +757,20 @@ void OpenProjectSimulator::setupBall()
 
 void OpenProjectSimulator::set_default_camera_position() {
     if(this->DUC) {
-#if USE_PHYSICS_TEST_SCENE
-        this->DUC->g_camera.Reset();
-        this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
-#else
+#if ACTIVE_SCENE == GAME_SCENE
         const float lookat_size = 16.0f;
         
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+#else
+        this->DUC->g_camera.Reset();
+        this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
 #endif
     }
 }
 
-void OpenProjectSimulator::setup_game() {
-#if USE_PHYSICS_TEST_SCENE
-    this->setup_demo_scene();
-    this->gravity = -10;
-#else
+void OpenProjectSimulator::setup_game() {    
+#if ACTIVE_SCENE == GAME_SCENE
     this->setupHeatGrid();
     this->setupWalls();
     this->setupPlayerPlatforms();
@@ -711,6 +778,12 @@ void OpenProjectSimulator::setup_game() {
     this->gravity = 0;
     this->score1 = 0;
     this->score2 = 0;
+#elif ACTIVE_SCENE == RIGID_BODY_TEST_SCENE
+    this->setup_rigid_body_test();
+    this->gravity = -10;
+#elif ACTIVE_SCENE == JOINT_TEST_SCENE
+    this->setup_joint_test();
+    this->gravity = -10;
 #endif
 
     // 
@@ -725,7 +798,7 @@ void OpenProjectSimulator::setup_game() {
 //
 
 void OpenProjectSimulator::update_game_logic(float dt) {
-#if USE_PHYSICS_TEST_SCENE 
+#if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
 
@@ -797,96 +870,31 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
     //
     // Update the mass-spring-system using the Midpoint method.
     //
-    {
-        Vec3 temp_positions[MAX_MASSPOINTS];  // x(t + h/2)
-        Vec3 temp_velocities[MAX_MASSPOINTS]; // v(t + h/2)
+    {       
         float dt_2 = 0.5f * dt;
 
-        //
-        // Calculate x(t + h/2) based on v(t) for all mass points. Apply gravity to v(t + h/2).
-        //
+        // Save the old positions and velocities so that they can be restored later.
+        Vec3 previous_positions[MAX_MASSPOINTS];
+        Vec3 previous_velocities[MAX_MASSPOINTS];
 
         for(int i = 0; i < this->masspoint_count; ++i) {
             Masspoint & masspoint = this->masspoints[i];
-            if(masspoint.inverse_mass == 0.0f) {
-                temp_velocities[i] = Vec3(0, 0, 0);
-                temp_positions[i]  = masspoint.position;
-                continue;
-            }
-
-            temp_positions[i]  = masspoint.position + dt_2 * masspoint.velocity;
-            temp_velocities[i] = masspoint.velocity;
+            previous_positions[i] = masspoint.position;
+            previous_velocities[i] = masspoint.velocity;
         }
+        
+        this->calculate_masspoint_forces(); // Calculate a(t) for all masspoints based on x(t), v(t).
+        this->calculate_masspoint_positions(dt_2); // Calculate x(t + h/2) for all masspoints based on v(t).
+        this->calculate_masspoint_velocities(dt_2); // Calculate v(t + h/2) for all masspoints based on a(t).
+        this->calculate_masspoint_forces(); // Calculate a(t + h) for all masspoints based on x(t + h/2), v(t + h/2)
 
-        //
-        // Calculate a(t) for all springs
-        // Calculate v(t + h/2) based on a(t) of all springs for all masspoints
-        //
+        // Calculate x(t + h) based on v(t + h/2).
+        for(int i = 0; i < this->masspoint_count; ++i) this->masspoints[i].position = previous_positions[i];
+        this->calculate_masspoint_positions(dt);
 
-        for(int i = 0; i < this->spring_count; ++i) {
-            Spring & spring = this->springs[i];
-            Masspoint & a = this->masspoints[spring.a], & b = this->masspoints[spring.b];
-
-            // Calculate a(t) for all springs, based on x(t) and v(t) of a, b
-
-            Vec3 direction = a.position - b.position;
-            spring.current_length = norm(direction);
-            spring.current_force_from_a_to_b = -spring.stiffness * (spring.current_length - spring.initial_length) * (direction / spring.current_length);
-
-            // Calculate v(t + h/2) based on the spring forces for all masspoints
-
-            if(a.inverse_mass != 0.f) temp_velocities[spring.a] += dt_2 * a.inverse_mass * (spring.current_force_from_a_to_b);
-            if(b.inverse_mass != 0.f) temp_velocities[spring.b] -= dt_2 * b.inverse_mass * (spring.current_force_from_a_to_b);
-        }
-
-        //
-        // Apply damping to v(t + h/2)
-        //
-
-        for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
-            temp_velocities[i] -= dt * masspoint.inverse_mass * temp_velocities[i] * this->spring_damping;
-        }
-
-        //
-        // Calculate x(t + h) using v(t + h/2). Apply gravity to v(t + h).
-        //
-
-        for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
-
-            masspoint.position += dt * temp_velocities[i];
-        }
-
-        //
-        // Calculate a(t + h/2) based on x(t + h/2) and v(t + h/2) for all springs
-        // Calculate v(t + h) based on the spring forces for all masspoints
-        //
-
-        for(int i = 0; i < this->spring_count; ++i) {
-            // Calculate a(t + h/2) based on x(t + h/2) and v(t + h/2) for all springs
-
-            Spring & spring = this->springs[i];
-            Vec3 direction = (temp_positions[spring.a] + dt_2 * temp_velocities[spring.a]) - (temp_positions[spring.b] + dt_2 * temp_velocities[spring.b]);
-            Real current_length = norm(direction);
-            spring.current_force_from_a_to_b = -spring.stiffness * (current_length - spring.initial_length) * (direction / current_length);
-
-            // Calculate v(t + h) based on the spring forces for all masspoints
-
-            Masspoint & a = this->masspoints[spring.a], & b = this->masspoints[spring.b];
-
-            if(a.inverse_mass != 0.f) a.velocity += dt * a.inverse_mass * spring.current_force_from_a_to_b;
-            if(b.inverse_mass != 0.f) b.velocity -= dt * b.inverse_mass * spring.current_force_from_a_to_b;
-        }
-
-        //
-        // Apply damping to v(t + h)
-        //
-
-        for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
-            masspoint.velocity -= dt * masspoint.inverse_mass * masspoint.velocity * this->spring_damping;
-        }
+        // Calculate v(t + h) based on a(t).
+        for(int i = 0; i < this->masspoint_count; ++i) this->masspoints[i].velocity = previous_velocities[i];
+        this->calculate_masspoint_velocities(dt);
     }
 
     //
