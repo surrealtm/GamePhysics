@@ -686,6 +686,8 @@ void OpenProjectSimulator::setup_game() {
     setupWalls();
     setupPlayerPlatforms();
     setupBall();
+#endif
+
     // 
     // THIS MUST STAY HERE OR ELSE THE FIXED DELTA TIME UPDATER
     // WILL TRY TO CATCH UP ON A 50-YEAR TIME FRAME.
