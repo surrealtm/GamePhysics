@@ -85,11 +85,10 @@ struct Masspoint {
 	Real inverse_mass; // 0 means this masspoint is fixed in space.
 	Vec3 position;
 	Vec3 velocity;
-    Vec3 frame_force; // External forces applied on this masspoint.
     Vec3 _internal_force; // Read only, stored for easier access when doing the Midpoint integration.
-
+    
     void create(Vec3 position, Real mass);
-    void apply_force(Vec3 force);
+	void apply_impulse(Vec3 impulse);
 };
 
 //
@@ -107,12 +106,10 @@ struct Rigid_Body {
 	Real inverse_mass;
 	
 	Vec3 frame_force;
-    Vec3 frame_linear_impulse; // Summed together and added once to the velocity, so that first collision in the frame does not manipulate the second one (due to already changing the velocity...)
 	Vec3 linear_velocity;
 	Vec3 linear_factor; // Movement of this body will be multiplied by this factor, meaning we can restrict or increase movement along certain axis.
 
 	Vec3 frame_torque;
-    Vec3 frame_angular_impulse; // See frame_linear_impulse
 	Vec3 angular_velocity; 
 	Vec3 angular_momentum;
 	Vec3 angular_factor; // See linear_factor
@@ -291,7 +288,7 @@ private:
 	// updates per second, with the appropriate delta for these updates.
 	//
 	double time_of_previous_update;
-	double time_factor;
+	double time_factor; // @Cleanup: This doesn't seem to work (at least for rigid bodies and springs...)
 	bool running; // The UI can toggle this for debugging purposes. The game loop will not be executed when this is false.
 
 	//

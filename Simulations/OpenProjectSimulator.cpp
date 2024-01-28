@@ -150,15 +150,14 @@ SAT_Input sat_input(Rigid_Body & body) {
 //
 
 void Masspoint::create(Vec3 position, Real mass) {
-    this->inverse_mass = mass > 0.0f ? 1.0f / mass : 0.0f;
-    this->position     = position;
-    this->velocity     = Vec3(0, 0, 0);
-    this->frame_force  = Vec3(0, 0, 0);
+    this->inverse_mass    = mass > 0.0f ? 1.0f / mass : 0.0f;
+    this->position        = position;
+    this->velocity        = Vec3(0, 0, 0);
     this->_internal_force = Vec3(0, 0, 0);
 }
 
-void Masspoint::apply_force(Vec3 force) {
-    this->frame_force += force;
+void Masspoint::apply_impulse(Vec3 impulse) {
+    this->velocity += impulse * this->inverse_mass;
 }
 
 
@@ -200,11 +199,9 @@ void Rigid_Body::warp(Vec3 center, Quat orientation) {
 	this->orientation    = orientation.unit();
 
 	this->frame_force          = Vec3(0, 0, 0);
-	this->frame_linear_impulse = Vec3(0, 0, 0);
 	this->linear_velocity      = Vec3(0, 0, 0);
 	
     this->frame_torque          = Vec3(0, 0, 0);
-    this->frame_angular_impulse = Vec3(0, 0, 0);
     this->angular_velocity      = Vec3(0, 0, 0);
 	this->angular_momentum      = Vec3(0, 0, 0);
 
@@ -383,9 +380,14 @@ void Joint::create(Masspoint * masspoint, Rigid_Body * rigid_body) {
 }
 
 void Joint::evaluate(float dt) {
-    Vec3 delta_to_fixed = this->masspoint->position - (this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint); // The "error" between where the ideal joint position is, and where the masspoint currently is in space.
-    this->rigid_body->apply_impulse(masspoint->position, delta_to_fixed);
-    //    this->masspoint->apply_force(this->rigid_body->get_world_space_velocity_at(this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint) - delta_to_fixed);
+    Real body_factor = 0.5;
+    Real point_factor = 1 - body_factor;
+
+    {
+        Vec3 delta = this->masspoint->velocity - this->rigid_body->linear_velocity;
+        this->rigid_body->apply_impulse(this->masspoint->position, delta * body_factor);
+        this->masspoint->apply_impulse(-delta * point_factor);
+    }
 }
 
 
@@ -527,7 +529,7 @@ int OpenProjectSimulator::create_spring(int a, int b, Real initial_length, Real 
     ++this->spring_count;
     return index;
 }
-
+
 int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(this->rigid_body_count < MAX_RIGID_BODIES);
     int index = this->rigid_body_count;
@@ -619,20 +621,25 @@ void OpenProjectSimulator::setup_rigid_body_test() {
 void OpenProjectSimulator::setup_joint_test() {
     Vec3 body_position = Vec3(0, 0, 0);
     Vec3 fixed_position = Vec3(0, 5, 0);
-    
+
     Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
     body->warp(body_position - Vec3(0, body->size.y / 2, 0), Quat(0, 0, 0, 1));
 
     int body_masspoint_index = this->create_masspoint(body_position, 1);
     int base_masspoint_index = this->create_masspoint(fixed_position, 0);
 
-    Masspoint * body_masspoint = this->query_masspoint(body_masspoint_index);
+    Masspoint * body_masspoint = this->query_masspoint(body_masspoint_index);    
+    Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 5, 40);
     
-    Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 2.5, 40);
-
     this->create_joint(body_masspoint, body);
-
-    //    body->apply_impulse(body->center_of_mass, Vec3(0, 1, 0));
+    body->apply_impulse(body_position, Vec3(0, 1, 0));
+    
+    // Set up a reference spring without joint.
+    {
+        int a = this->create_masspoint(Vec3(5, 0, 0), 1);
+        int b = this->create_masspoint(Vec3(5, 5, 0), 0);    
+        Spring * spring = this->create_and_query_spring(a, b, 4, 40);
+    }
 }
 
 void OpenProjectSimulator::setupHeatGrid()
@@ -859,8 +866,6 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
 
         for(int i = 0; i < this->masspoint_count; ++i) {
             Masspoint & masspoint = this->masspoints[i];
-            if(masspoint.inverse_mass > 0.) masspoint.apply_force(Vec3(0, this->gravity, 0)); // Apply gravity.
-            
             previous_positions[i] = masspoint.position;
             previous_velocities[i] = masspoint.velocity;
         }
@@ -877,12 +882,6 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
         // Calculate v(t + h) based on a(t).
         for(int i = 0; i < this->masspoint_count; ++i) this->masspoints[i].velocity = previous_velocities[i];
         this->calculate_masspoint_velocities(dt);
-
-        // Reset the frame forces.
-        for(int i = 0; i < this->masspoint_count; ++i) {
-            Masspoint & masspoint = this->masspoints[i];
-            masspoint.frame_force = Vec3(0.);
-        }
     }
         
     //
@@ -1135,21 +1134,19 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
             // Integrate the linear part using Euler.
             //
 
-            body.linear_velocity += body.frame_linear_impulse;
             body.center_of_mass   = body.center_of_mass  + body.linear_velocity * dt; // Integrate the position
             body.linear_velocity  = body.linear_velocity + body.frame_force * body.inverse_mass * dt; // Integrate the velocity.
             body.linear_velocity *= body.linear_factor;
 
             // Reset the accumulators every frame.
             body.frame_force = { 0 };
-            body.frame_linear_impulse = { 0 };
-
+            
             //
             // Integrate the angular part.
             //
 
             // Integrate the angular momentum
-            body.angular_momentum  = body.angular_momentum + body.frame_angular_impulse + dt * body.frame_torque;
+            body.angular_momentum  = body.angular_momentum + + dt * body.frame_torque;
             body.angular_momentum *= body.angular_factor;
             
             // Update the inertiat tensor and the angular velocity.
@@ -1161,7 +1158,6 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
 
             // Reset the accumulators every frame.
             body.frame_torque = { 0 };
-            body.frame_angular_impulse = { 0 };
             
             //
             // Finally build the new transformation matrices.
@@ -1184,7 +1180,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
     }
 
     //
-    // Finally update all joints.
+    // Update all joints.
     //
     for(int i = 0; i < this->joint_count; ++i) {
         Joint & joint = this->joints[i];
@@ -1414,7 +1410,7 @@ void OpenProjectSimulator::calculate_masspoint_forces() {
         Masspoint & masspoint = this->masspoints[i];
         if(masspoint.inverse_mass == 0.) continue;
 
-        masspoint._internal_force = masspoint.frame_force;
+        masspoint._internal_force = Vec3(0, this->gravity, 0);
     }
     
     // Spring forces.
@@ -1462,7 +1458,6 @@ void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
         if(masspoint.inverse_mass == 0.) continue;
         
         masspoint.velocity += dt * masspoint.inverse_mass * masspoint._internal_force;
-        masspoint._internal_force = Vec3(0.0);
     }
 }
 
