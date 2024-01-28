@@ -365,6 +365,10 @@ void TW_CALL tw_reset_button_callback(void *user_pointer) {
 }
 
 
+//
+// Inherited functions.
+//
+
 OpenProjectSimulator::OpenProjectSimulator() {
     this->DUC = NULL;
     setup_timing();
@@ -457,6 +461,10 @@ void OpenProjectSimulator::onClick(int x, int y) {}
 void OpenProjectSimulator::onMouse(int x, int y) {}
 
 
+//
+// Simulator API.
+//
+
 int OpenProjectSimulator::create_masspoint(Vec3 position, Real mass) {
     assert(this->masspoint_count < MAX_MASSPOINTS);
     int index = this->masspoint_count;
@@ -499,8 +507,6 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restituti
     return index;
 }
 
-
-
 void OpenProjectSimulator::apply_impulse_to_masspoint(int index, Vec3 impulse) {
     assert(index >= 0 && index < this->masspoint_count);
     this->masspoints[index].velocity += impulse;
@@ -519,111 +525,6 @@ void OpenProjectSimulator::apply_torque_to_rigid_body(int index, Vec3 torque) {
 void OpenProjectSimulator::warp_rigid_body(int index, Vec3 position, Quat orientation) {
     assert(index >= 0 && index < this->rigid_body_count);
     this->rigid_bodies[index].warp(position, orientation);
-}
-
-
-Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
-    assert(index >= 0 && index < this->rigid_body_count);
-    return &this->rigid_bodies[index];
-}
-
-Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
-    return this->query_rigid_body(this->create_rigid_body(size, mass, restitution, is_trigger));
-}
-
-Spring * OpenProjectSimulator::query_spring(int index) {
-    assert(index >= 0 && index < this->spring_count);
-    return &this->springs[index];    
-}
-
-Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
-    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
-}
-
-void OpenProjectSimulator::calculate_masspoint_forces() {
-    // Gravity force.
-    for(int i = 0; i < this->masspoint_count; ++i) {
-        Masspoint & masspoint = this->masspoints[i];
-        if(masspoint.inverse_mass == 0.) continue;
-
-        masspoint.frame_force = Vec3(0, this->gravity, 0);
-    }
-    
-    // Spring forces.
-    for(int i = 0; i < this->spring_count; ++i) {
-        Spring & spring = this->springs[i];
-        Masspoint & a = this->masspoints[spring.a], & b = this->masspoints[spring.b];
-
-        if(a.inverse_mass == 0. && b.inverse_mass == 0.) continue;
-            
-        // Calculate a(t) for all springs, based on x(t) and v(t) of a, b
-
-        Vec3 delta = a.position - b.position;
-        spring.current_length = norm(delta);
-        spring.current_force_from_a_to_b = -spring.stiffness * (spring.current_length - spring.initial_length) * (delta / spring.current_length);
-
-        // Calculate v(t + h/2) based on the spring forces for all masspoints
-
-        Real total_mass = a.inverse_mass + b.inverse_mass;
-            
-        a.frame_force += (a.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
-        b.frame_force -= (b.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
-    }
-
-    // Damping force.
-    for(int i = 0; i < this->masspoint_count; ++i) {
-        Masspoint & masspoint = this->masspoints[i];
-        if(masspoint.inverse_mass == 0.) continue;
-
-        masspoint.frame_force -= masspoint.velocity * this->spring_damping;
-    }    
-}
-
-void OpenProjectSimulator::calculate_masspoint_positions(float dt) {
-    for(int i = 0; i < this->masspoint_count; ++i) {
-        Masspoint & masspoint = this->masspoints[i];
-        if(masspoint.inverse_mass == 0.) continue;
-        
-        masspoint.position += dt * masspoint.velocity;
-    }
-}
-
-void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
-    for(int i = 0; i < this->masspoint_count; ++i) {
-        Masspoint & masspoint = this->masspoints[i];
-        if(masspoint.inverse_mass == 0.) continue;
-        
-        masspoint.velocity += dt * masspoint.inverse_mass * masspoint.frame_force;
-        masspoint.frame_force = Vec3(0, 0, 0);
-    }
-}
-
-void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
-    //
-    // Apply a friction force to the racket to stop it from moving.
-    //
-    racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -racket->platform->linear_velocity.y, 0));
-    
-    //
-    // Apply a movement force when the player has pressed the respective keys to do so.
-    //
-    const float speed = 5.f; // This is in meters / second
-
-    if(DXUTIsKeyDown(key_up)) {
-        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
-    }
-
-    if(DXUTIsKeyDown(key_down)) {
-        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
-    }
-}
-
-bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
-    for(Trigger_Collision & collision : this->trigger_collisions) {
-        if(collision.trigger == trigger && collision.other == other) return true;
-    }
-
-    return false;
 }
 
 
@@ -1338,12 +1239,13 @@ void OpenProjectSimulator::draw_game() {
             this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
-    /*for(Vec3 & point : this->debug_draw_points) {
+    
+    for(Vec3 & point : this->debug_draw_points) {
         Real sphere_radius = 0.05;
         Real r = 1, g = 0, b = 0;
         this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(r, g, b), 1, Vec3(r, g, b));
         this->DUC->drawSphere(point, Vec3(sphere_radius, sphere_radius, sphere_radius));
-    }*/
+    }
 }
 
 void OpenProjectSimulator::debug_print() {
@@ -1397,3 +1299,121 @@ void OpenProjectSimulator::debug_print() {
 
     printf("================================================================================\n");
 }
+
+//
+// Private Helpers.
+//
+
+Rigid_Body * OpenProjectSimulator::query_rigid_body(int index) {
+    assert(index >= 0 && index < this->rigid_body_count);
+    return &this->rigid_bodies[index];
+}
+
+Rigid_Body * OpenProjectSimulator::create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
+    return this->query_rigid_body(this->create_rigid_body(size, mass, restitution, is_trigger));
+}
+
+Spring * OpenProjectSimulator::query_spring(int index) {
+    assert(index >= 0 && index < this->spring_count);
+    return &this->springs[index];    
+}
+
+Spring * OpenProjectSimulator::create_and_query_spring(int a, int b, Real initial_length, Real stiffness) {
+    return this->query_spring(this->create_spring(a, b, initial_length, stiffness));
+}
+
+Masspoint * OpenProjectSimulator::query_masspoint(int index) {
+    assert(index >= 0 && index < this->masspoint_count);
+    return &this->masspoints[index];
+}
+
+Masspoint * OpenProjectSimulator::create_and_query_masspoint(Vec3 position, Real mass) {
+    return this->query_masspoint(this->create_masspoint(position, mass));
+}
+
+void OpenProjectSimulator::calculate_masspoint_forces() {
+    // Gravity force.
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+
+        masspoint.frame_force = Vec3(0, this->gravity, 0);
+    }
+    
+    // Spring forces.
+    for(int i = 0; i < this->spring_count; ++i) {
+        Spring & spring = this->springs[i];
+        Masspoint & a = this->masspoints[spring.a], & b = this->masspoints[spring.b];
+
+        if(a.inverse_mass == 0. && b.inverse_mass == 0.) continue;
+            
+        // Calculate a(t) for all springs, based on x(t) and v(t) of a, b
+
+        Vec3 delta = a.position - b.position;
+        spring.current_length = norm(delta);
+        spring.current_force_from_a_to_b = -spring.stiffness * (spring.current_length - spring.initial_length) * (delta / spring.current_length);
+
+        // Calculate v(t + h/2) based on the spring forces for all masspoints
+
+        Real total_mass = a.inverse_mass + b.inverse_mass;
+            
+        a.frame_force += (a.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+        b.frame_force -= (b.inverse_mass / total_mass) * spring.current_force_from_a_to_b;
+    }
+
+    // Damping force.
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+
+        masspoint.frame_force -= masspoint.velocity * this->spring_damping;
+    }    
+}
+
+void OpenProjectSimulator::calculate_masspoint_positions(float dt) {
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+        
+        masspoint.position += dt * masspoint.velocity;
+    }
+}
+
+void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
+    for(int i = 0; i < this->masspoint_count; ++i) {
+        Masspoint & masspoint = this->masspoints[i];
+        if(masspoint.inverse_mass == 0.) continue;
+        
+        masspoint.velocity += dt * masspoint.inverse_mass * masspoint.frame_force;
+        masspoint.frame_force = Vec3(0, 0, 0);
+    }
+}
+
+void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
+    //
+    // Apply a friction force to the racket to stop it from moving.
+    //
+    racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -racket->platform->linear_velocity.y, 0));
+    
+    //
+    // Apply a movement force when the player has pressed the respective keys to do so.
+    //
+    const float speed = 5.f; // This is in meters / second
+
+    if(DXUTIsKeyDown(key_up)) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
+    }
+
+    if(DXUTIsKeyDown(key_down)) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
+    }
+}
+
+bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
+    for(Trigger_Collision & collision : this->trigger_collisions) {
+        if(collision.trigger == trigger && collision.other == other) return true;
+    }
+
+    return false;
+}
+
