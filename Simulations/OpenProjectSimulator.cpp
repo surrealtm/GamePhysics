@@ -784,78 +784,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     // Move the player rackets depending on player input -> MANU
     //
 
-    this->move_player_racket(&this->player_rackets[0], VK_UP, VK_DOWN);
-    this->move_player_racket(&this->player_rackets[1], 'W', 'S');
+    this->move_player_racket(&this->player_rackets[0], 'W', 'S');
+    this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN);
 
-    /*
-// nocheckin
-      if(DXUTIsKeyDown(VK_UP))
-    {
-        if(this->player_rackets[1].platform->linear_velocity.y < 0)
-        {
-            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
-        }
-        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, 1.5, 0));
-        
-    }else if(DXUTIsKeyDown(VK_DOWN))
-    {
-        if(this->player_rackets[1].platform->linear_velocity.y > 0)
-        {
-            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
-        }
-        this->player_rackets[1].platform->apply_force(player_rackets[1].platform->center_of_mass, Vec3(0, -1.5, 0));
-    }else
-    {
-        
-        if(this->player_rackets[1].platform->linear_velocity.y > -0.05 && this->player_rackets[1].platform->linear_velocity.y < 0.05)
-        {
-            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
-        }
-        if(this->player_rackets[1].platform->linear_velocity.y > 0)
-        {
-            this->player_rackets[1].platform->linear_velocity.y -= 0.03;
-            
-        }else if(this->player_rackets[1].platform->linear_velocity.y < 0)
-        {
-            this->player_rackets[1].platform->linear_velocity.y += 0.03;
-           
-        }
-        
-    }
-    if(DXUTIsKeyDown('W'))
-    {
-        if(this->player_rackets[0].platform->linear_velocity.y < 0)
-        {
-            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
-        }
-        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, 1.5, 0));
-    }else if(DXUTIsKeyDown(0x53))
-    {
-        if(this->player_rackets[1].platform->linear_velocity.y > 0)
-        {
-            this->player_rackets[1].platform->linear_velocity = Vec3(0,0,0);
-        }
-        this->player_rackets[0].platform->apply_force(player_rackets[0].platform->center_of_mass, Vec3(0, -1.5, 0));
-    }else
-    {
-        
-        if(this->player_rackets[0].platform->linear_velocity.y > -0.05 && this->player_rackets[0].platform->linear_velocity.y < 0.05)
-        {
-            this->player_rackets[0].platform->linear_velocity = Vec3(0,0,0);
-        }
-        if(this->player_rackets[0].platform->linear_velocity.y > 0)
-        {
-            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
-            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
-        }else if(this->player_rackets[0].platform->linear_velocity.y < 0)
-        {
-            this->player_rackets[0].platform->linear_velocity.y *= 0.9;
-            printf("%f", this->player_rackets[0].platform->linear_velocity.y);
-        }
-        
-    }
-    */
-    
     //
     // @Incomplete: Speed up or slow down the ball depending on the current
     // cell temperature -> DENNIS

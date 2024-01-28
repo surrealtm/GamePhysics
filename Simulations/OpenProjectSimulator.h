@@ -12,7 +12,7 @@
 
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets to the front
 #define USE_PHYSICS_TEST_SCENE false
-#define RIGID_BODY_POSITION_ERROR_CORRECTION true
+#define RIGID_BODY_POSITION_ERROR_CORRECTION false
 #define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
 
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
