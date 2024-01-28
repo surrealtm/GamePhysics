@@ -15,7 +15,7 @@
 #define GAME_SCENE            0x1
 #define RIGID_BODY_TEST_SCENE 0x2
 #define JOINT_TEST_SCENE      0x3
-#define ACTIVE_SCENE JOINT_TEST_SCENE
+#define ACTIVE_SCENE GAME_SCENE
 
 //
 // Simulation limits
