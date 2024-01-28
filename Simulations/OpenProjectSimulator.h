@@ -16,10 +16,13 @@
 #define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
 
 #define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
-#define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to walls
+#define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to wall
 
 #define PRINT_FIXED_FLOAT "%2.05f"
 #define PRINT_FIXED_VEC3  "{ " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT ", " PRINT_FIXED_FLOAT " }"
+
+#define WIN_SCORE 11
+#define GOAL_DELAY 0.1f // Time for collision detection sleep between goal and scene reset; change based on DT 
 
 //
 // Utility Functions.
@@ -202,6 +205,8 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
+	void reset_after_goal();
+	void reset_after_win();
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -265,6 +270,7 @@ private:
 	Rigid_Body* ball;
 	int score1;
 	int score2;
+	double goalTimeStamp;
 
 	float heat_accelleration_for_ball;
 

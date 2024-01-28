@@ -711,6 +711,7 @@ void OpenProjectSimulator::setup_game() {
     this->gravity = 0;
     this->score1 = 0;
     this->score2 = 0;
+    this->goalTimeStamp = 0;
 #endif
 
     // 
@@ -720,9 +721,30 @@ void OpenProjectSimulator::setup_game() {
     this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
-//
-// @Incomplete: Set up the proper scene -> JERRY
-//
+void OpenProjectSimulator::reset_after_goal() {
+    // Reset ball
+    this->ball->linear_velocity = Vec3(0, 0, 0);
+    this->ball->angular_velocity = Vec3(0, 0, 0);
+    this->ball->angular_momentum = Vec3(0, 0, 0);
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
+
+    // Reset player rackets
+    for (auto racket : player_rackets) {
+        racket.platform->linear_velocity = Vec3(0, 0, 0);
+        racket.platform->angular_velocity = Vec3(0, 0, 0);
+        racket.platform->angular_momentum = Vec3(0, 0, 0);
+    }
+    float heightPos = goals[0]->center_of_mass.y;
+    player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+	player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+}
+
+void OpenProjectSimulator::reset_after_win() {
+	this->reset_after_goal();
+    this->score1 = 0;
+    this->score2 = 0;
+}
 
 void OpenProjectSimulator::update_game_logic(float dt) {
 #if USE_PHYSICS_TEST_SCENE 
@@ -734,26 +756,31 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     // for the other player.
     //
     if(this->trigger_collision_occurred(this->goals[1], this->ball)) {
-        // Player one has scored. @Incomplete: Add the actual score value somewhere once the score value
-        // exists.
-        score1++;
-        printf("Player one has scored!\n");
+        // Player one has scored.
+        if (get_current_time_in_milliseconds() >= goalTimeStamp + GOAL_DELAY) {
+            printf("Player one has scored!\n");
+            goalTimeStamp = get_current_time_in_milliseconds();
+            score1++;
+            if (score1 >= WIN_SCORE) {
+                printf("Player one has won!\n");
+                reset_after_win();
+            } else
+                reset_after_goal();
+        }
     }
 
     if(this->trigger_collision_occurred(this->goals[0], this->ball)) {
-        // Player two has scored. @Incomplete: Add the actual score value somewhere once the score value
-        // exists.
-        score2++;
-        printf("Player zero has scored!\n");
-    }
-
-    if (score1 >= 11) {
-        printf("Player one has won!\n");
-        //reset();
-    }
-    else if (score2 >= 11) {
-		printf("Player two has won!\n");
-        //reset();
+        // Player two has scored.
+        if (get_current_time_in_milliseconds() >= goalTimeStamp + GOAL_DELAY) {
+            printf("Player two has scored!\n");
+            goalTimeStamp = get_current_time_in_milliseconds();
+            score2++;
+            if (score2 >= WIN_SCORE) {
+				printf("Player two has won!\n");
+                reset_after_win();
+            } else
+                reset_after_goal();
+        }
     }
 
     //get current position of ball on grid
