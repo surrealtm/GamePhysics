@@ -380,13 +380,16 @@ void Joint::create(Masspoint * masspoint, Rigid_Body * rigid_body) {
 }
 
 void Joint::evaluate(float dt) {
-    Real body_factor = 0.5;
-    Real point_factor = 1 - body_factor;
+    Real body_factor  = 0.5;
+    Real point_factor = 1.0 - body_factor;
 
     {
-        Vec3 delta = this->masspoint->velocity - this->rigid_body->linear_velocity;
-        this->rigid_body->apply_impulse(this->masspoint->position, delta * body_factor);
-        this->masspoint->apply_impulse(-delta * point_factor);
+        Vec3 relative_velocity = this->masspoint->velocity - this->rigid_body->linear_velocity;
+        Vec3 relative_position = this->masspoint->position - (this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint);
+        Vec3 impulse = relative_velocity + relative_position;
+        
+        this->rigid_body->apply_impulse(this->masspoint->position, impulse * body_factor);
+        this->masspoint->apply_impulse(-impulse * point_factor);
     }
 }
 
@@ -619,7 +622,7 @@ void OpenProjectSimulator::setup_rigid_body_test() {
 }
 
 void OpenProjectSimulator::setup_joint_test() {
-    Vec3 body_position = Vec3(0, 0, 0);
+    Vec3 body_position  = Vec3(0, 2, 0);
     Vec3 fixed_position = Vec3(0, 5, 0);
 
     Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
@@ -629,17 +632,11 @@ void OpenProjectSimulator::setup_joint_test() {
     int base_masspoint_index = this->create_masspoint(fixed_position, 0);
 
     Masspoint * body_masspoint = this->query_masspoint(body_masspoint_index);    
-    Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 5, 40);
+    Spring * spring = this->create_and_query_spring(base_masspoint_index, body_masspoint_index, 2, 40);
     
     this->create_joint(body_masspoint, body);
-    body->apply_impulse(body_position, Vec3(0, 1, 0));
-    
-    // Set up a reference spring without joint.
-    {
-        int a = this->create_masspoint(Vec3(5, 0, 0), 1);
-        int b = this->create_masspoint(Vec3(5, 5, 0), 0);    
-        Spring * spring = this->create_and_query_spring(a, b, 4, 40);
-    }
+
+    Rigid_Body * floor = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0, 1, false);
 }
 
 void OpenProjectSimulator::setupHeatGrid()
