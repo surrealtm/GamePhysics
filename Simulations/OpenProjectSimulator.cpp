@@ -192,6 +192,12 @@ void Masspoint::create(Vec3 position, Real mass) {
     this->_internal_force = Vec3(0, 0, 0);
 }
 
+void Masspoint::warp(Vec3 position) {
+    this->position        = position;
+    this->velocity        = Vec3(0, 0, 0);
+    this->_internal_force = Vec3(0, 0, 0);
+}
+
 void Masspoint::apply_impulse(Vec3 impulse) {
     this->velocity += impulse * this->inverse_mass;
 }
@@ -826,15 +832,25 @@ void OpenProjectSimulator::reset_after_goal() {
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
 
-    // Reset player rackets
-    for (auto racket : player_rackets) {
-        racket.platform->linear_velocity = Vec3(0, 0, 0);
-        racket.platform->angular_velocity = Vec3(0, 0, 0);
-        racket.platform->angular_momentum = Vec3(0, 0, 0);
-    }
+    // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
     player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 	player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+
+    // Reset the player springs
+    {
+        Masspoint * m1 = this->query_masspoint(this->player_rackets[0].spring->a);
+        Masspoint * m2 = this->query_masspoint(this->player_rackets[0].spring->b);
+        m1->warp(this->goals[0]->center_of_mass + Vec3(this->goals[0]->size.x / 2, 0, 0));
+        m2->warp(this->player_rackets[0].platform->center_of_mass - Vec3(this->player_rackets[0].platform->size.x / 2, 0, 0));
+    }
+
+    {
+        Masspoint * m1 = this->query_masspoint(this->player_rackets[1].spring->a);
+        Masspoint * m2 = this->query_masspoint(this->player_rackets[1].spring->b);
+        m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
+        m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
+    }
 }
 
 void OpenProjectSimulator::reset_after_win() {

@@ -91,6 +91,7 @@ struct Masspoint {
     Vec3 _internal_force; // Read only, stored for easier access when doing the Midpoint integration.
     
     void create(Vec3 position, Real mass);
+    void warp(Vec3 position);
 	void apply_impulse(Vec3 impulse);
 };
 
