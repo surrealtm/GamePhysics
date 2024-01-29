@@ -532,29 +532,22 @@ void OpenProjectSimulator::simulateTimestep(float timestep) {
     }
     
     //
-    // Prepare the frame.
-    //
-    this->debug_draw_points.clear();
-
-    //
     // :TimeStep
     //
 #if USE_FIXED_DT
     double now = get_current_time_in_milliseconds();
     
     //
-    // Run the actual game logic.
-    //
-    this->update_game_logic(FIXED_DT * this->time_factor);
-
-    //
-    // Run the physics engine to keep up with the requested timestep.
+    // Run the game logic and physics engine to keep up with the requested timestep.
     //
     while(now - this->time_of_previous_update > FIXED_DT) {
+        this->debug_draw_points.clear();
+        this->update_game_logic(FIXED_DT);
         this->update_physics_engine(FIXED_DT);
         this->time_of_previous_update += FIXED_DT / this->time_factor;
     }
 #else
+    this->debug_draw_points.clear();
     this->update_game_logic(timestep);
     this->update_physics_engine(timestep);
 #endif
