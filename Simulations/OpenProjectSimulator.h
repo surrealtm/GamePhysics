@@ -15,7 +15,7 @@
 #define GAME_SCENE            0x1
 #define RIGID_BODY_TEST_SCENE 0x2
 #define JOINT_TEST_SCENE      0x3
-#define ACTIVE_SCENE JOINT_TEST_SCENE // nocheckin
+#define ACTIVE_SCENE GAME_SCENE
 
 //
 // Simulation limits
@@ -141,7 +141,7 @@ struct Rigid_Body {
 	void awake();
 	bool inactive();
 
-	Vec3 get_world_space_velocity_at(Vec3 world_space_position);
+	Vec3 get_velocity_at_world_space(Vec3 world_space_position);
 };
 
 // This records a collision between a trigger rigid body and another rigid body.
@@ -184,10 +184,10 @@ struct Heat_Grid {
 struct Joint {
 	Masspoint *masspoint;
 	Rigid_Body *rigid_body;
-	Vec3 fixed_rigid_body_to_masspoint; // The local offset of the masspoint on the rigid body, as it ought to be. The true delta is tried to be as close to this as possible.
+	Vec3 anchor_point_on_body; // The local offset of the masspoint on the rigid body, as it ought to be. The true delta is tried to be as close to this as possible.
 
     void create(Masspoint * masspoint, Rigid_Body * rigid_body);
-    void evaluate(float dt);
+    void evaluate();
 };
 
 //
@@ -258,9 +258,7 @@ public:
 	void debug_print();
 
 private:
-	// @Cleanup: Correct order of all these methods...
-
-    Rigid_Body * query_rigid_body(int index);
+	Rigid_Body * query_rigid_body(int index);
     Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
     Spring * query_spring(int index);
@@ -290,9 +288,10 @@ private:
 	// updates per second, with the appropriate delta for these updates.
 	//
 	double time_of_previous_update;
-	double time_factor; // @Cleanup: This doesn't seem to work (at least for rigid bodies and springs...)
+	double time_factor; // Slows down the time for debugging by evaluation steps at a slower interval.
 	bool running; // The UI can toggle this for debugging purposes. The game loop will not be executed when this is false.
-
+    bool stepping; // The UI can toggle this for debugging purposes. 'running' will be set to false after every step.
+    
 	//
 	// General stuff.
 	//

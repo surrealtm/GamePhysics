@@ -100,6 +100,32 @@ Quat quat_from_euler_angles(Real x, Real y, Real z) {
     return result;
 }
 
+Vec3 quat_rotate_vec3(Quat quat, Vec3 vec) {
+    // @Cut'n'Paste: sat_rotate in sat.cpp
+    Real w_squared = quat.w * quat.w;
+    Real u_dot_u = quat.x * quat.x + quat.y * quat.y + quat.z * quat.z;
+    Real u_dot_v = quat.x * vec.x  + quat.y * vec.y  + quat.z * vec.z;
+
+    Real u_cross_v_x = (quat.y * vec.z - quat.z * vec.y);
+    Real u_cross_v_y = (quat.z * vec.x - quat.x * vec.z);
+    Real u_cross_v_z = (quat.x * vec.y - quat.y * vec.x);
+    
+    Real rotated_x = 2 * u_dot_v * quat.x + (w_squared - u_dot_u) * vec.x + 2 * quat.w * u_cross_v_x;
+    Real rotated_y = 2 * u_dot_v * quat.y + (w_squared - u_dot_u) * vec.y + 2 * quat.w * u_cross_v_y;
+    Real rotated_z = 2 * u_dot_v * quat.z + (w_squared - u_dot_u) * vec.z + 2 * quat.w * u_cross_v_z;
+
+    return { rotated_x, rotated_y, rotated_z };
+}
+
+Quat quat_conjugate(Quat quat) {
+    Quat result;
+    result.x = -quat.x;
+    result.y = -quat.y;
+    result.z = -quat.z;
+    result.w =  quat.w;
+    return result;
+}
+
 
 Vec3 lerp(Vec3 from, Vec3 to, Real t) {
     return Vec3(from.x * (1 - t) + to.x * t,
@@ -301,7 +327,7 @@ bool Rigid_Body::inactive() {
     return this->inverse_mass == 0 || this->sleeping;
 }
 
-Vec3 Rigid_Body::get_world_space_velocity_at(Vec3 world_space_position) {
+Vec3 Rigid_Body::get_velocity_at_world_space(Vec3 world_space_position) {
 	Vec3 position_relative_to_center = world_space_position - this->center_of_mass;
 
 	return this->linear_velocity + cross(this->angular_velocity, position_relative_to_center);
@@ -386,21 +412,41 @@ float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 void Joint::create(Masspoint * masspoint, Rigid_Body * rigid_body) {
     this->masspoint = masspoint;
     this->rigid_body = rigid_body;
-    this->fixed_rigid_body_to_masspoint = this->masspoint->position - this->rigid_body->center_of_mass;
+    this->anchor_point_on_body = quat_rotate_vec3(quat_conjugate(this->rigid_body->orientation), this->masspoint->position - this->rigid_body->center_of_mass);
 }
 
-void Joint::evaluate(float dt) {
-    Real body_factor  = 0.5;
-    Real point_factor = 1.0 - body_factor;
+void Joint::evaluate() {
+    //
+    // Copied from: https://github.com/chrisgilbertjr/spring/blob/master/source/spring/spDistanceJoint.c
+    // @@Robustness: This has quite a lot of error, even when just hanging around like I do all day.
+    // Maybe this can be improved by "anticipating" gravity by essentially evaluating what the velocity will be
+    // next frame, instead of just taking the current velocity, so that the applied impulse is a bit bigger?
+    //
 
-    {
-        Vec3 relative_velocity = this->masspoint->velocity - this->rigid_body->get_world_space_velocity_at(this->masspoint->position);
-        Vec3 relative_position = this->masspoint->position - (this->rigid_body->center_of_mass + this->fixed_rigid_body_to_masspoint);
-        Vec3 impulse = relative_velocity + relative_position;
-        
-        this->rigid_body->apply_impulse(this->masspoint->position, impulse * body_factor);
-        this->masspoint->apply_impulse(-impulse * point_factor);
-    }
+    Vec3 world_space_anchor_point = this->rigid_body->center_of_mass + quat_rotate_vec3(this->rigid_body->orientation, this->anchor_point_on_body);
+    
+    Vec3 relative_position = this->masspoint->position - world_space_anchor_point;
+    Real distance = norm(relative_position);
+    Vec3 normal = distance > 0.0 ? (relative_position * (1.0 / distance)) : relative_position;
+    
+    Vec3 relative_velocity = this->masspoint->velocity - this->rigid_body->get_velocity_at_world_space(world_space_anchor_point);
+    Real rv_dot_normal = dot(normal, relative_velocity);
+    
+    Vec3 point_on_body = world_space_anchor_point - this->rigid_body->center_of_mass;
+    Vec3 point_on_body_cross_normal = cross(point_on_body, normal);
+    Vec3 applied_inertia_on_body = cross(mat3_mul_vec3(this->rigid_body->inverse_inertia, point_on_body_cross_normal), point_on_body);
+
+    Real impulse_nominator = distance + rv_dot_normal;
+    Real impulse_denominator = this->masspoint->inverse_mass + this->rigid_body->inverse_mass + dot(applied_inertia_on_body, normal);
+
+    Real impulse_magnitude = impulse_nominator / impulse_denominator;
+    Vec3 impulse = normal * impulse_magnitude;
+
+    Vec3 masspoint_impulse = -impulse;
+    Vec3 rigidbody_impulse =  impulse;
+    
+    this->masspoint->apply_impulse(masspoint_impulse);
+    this->rigid_body->apply_impulse(world_space_anchor_point, rigidbody_impulse);
 }
 
 
@@ -421,7 +467,8 @@ void TW_CALL tw_reset_button_callback(void *user_pointer) {
 OpenProjectSimulator::OpenProjectSimulator() {
     this->DUC           = NULL;
     this->running       = true;
-    this->time_factor   = 1.0; // @Cleanup: Doesn't work peroply, doesn't it
+    this->stepping      = false;
+    this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
     this->heat_alpha    = 0.8f; // Half decay.
     setup_timing();
@@ -440,6 +487,7 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
     TwType TW_TYPE_DRAW_REQUESTS = TwDefineEnumFromString("DrawRequests", "Springs,HeatMap,RigidBodies,Everything");
     TwAddButton(this->tweak_bar, "Reset", [](void * data){ tw_reset_button_callback(data); }, this, "");
     TwAddVarRW(this->tweak_bar, "Running", TW_TYPE_BOOLCPP, &this->running, "");
+    TwAddVarRW(this->tweak_bar, "Stepping", TW_TYPE_BOOLCPP, &this->stepping, "");
 	TwAddVarRW(this->tweak_bar, "DrawRequests", TW_TYPE_DRAW_REQUESTS, &this->draw_requests, "");
     TwAddVarRW(this->tweak_bar, "Time Factor", TW_TYPE_DOUBLE, &this->time_factor, "min=0.001 max=10 step=0.001");
 
@@ -466,6 +514,14 @@ void OpenProjectSimulator::notifyCaseChanged(int testCase) {
 void OpenProjectSimulator::simulateTimestep(float timestep) {
     if(!this->running) {
         this->time_of_previous_update = get_current_time_in_milliseconds();
+        return;
+    }
+
+    if(this->stepping) {
+        this->debug_draw_points.clear();
+        this->update_game_logic(FIXED_DT);
+        this->update_physics_engine(FIXED_DT);
+        this->running = false;
         return;
     }
     
@@ -623,12 +679,12 @@ void OpenProjectSimulator::setup_rigid_body_test() {
 }
 
 void OpenProjectSimulator::setup_joint_test() {
-    Vec3 body_position  = Vec3(0, 2, 0);
+    Vec3 body_position  = Vec3(4, 4, 0);
     Vec3 fixed_position = Vec3(0, 5, 0);
 
     Rigid_Body * body = this->create_and_query_rigid_body(Vec3(1, 1, 1), 1, 1, false);
     body->warp(body_position - Vec3(0, 0.707, 0), quat_from_euler_angles(0.125, 0, 0));
-    //    body->apply_impulse(body->center_of_mass + Vec3(body->size.x / 2, 0, 0), Vec3(2, 0, 0));
+    body->apply_impulse(body->center_of_mass + Vec3(0.5, 0, 0), Vec3(4, 0, 0));
 
     int body_masspoint_index = this->create_masspoint(body_position, 1);
     int base_masspoint_index = this->create_masspoint(fixed_position, 0);
@@ -638,9 +694,9 @@ void OpenProjectSimulator::setup_joint_test() {
     
     this->create_joint(body_masspoint, body);
 
-    //    Rigid_Body * floor = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0, 1, false);
+    Rigid_Body * floor = this->create_and_query_rigid_body(Vec3(4, 1, 4), 0, 1, false);
 
-    this->gravity = 0;
+    this->gravity = -10;
 }
 
 void OpenProjectSimulator::setupHeatGrid()
@@ -675,26 +731,30 @@ void OpenProjectSimulator::setupWalls()
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
     float heightPos = goals[0]->center_of_mass.y;
+    const Real restitution = 2; // @@Volatile: This should match the ball's restitution.
+    const Real stiffness = 40;
+    const Real damping   = 0.99;
+
     // Player 1
     {
-        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, 1, false);
+        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, restitution, false);
         this->player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(Vec3(goals[0]->center_of_mass.x + goals[0]->size.x / 2, goals[0]->center_of_mass.y, goals[0]->center_of_mass.z), 0);
         int m2 = this->create_masspoint(Vec3(player_rackets[0].platform->center_of_mass.x - player_rackets[0].platform->size.x / 2, player_rackets[0].platform->center_of_mass.y, player_rackets[0].platform->center_of_mass.z) , 1);
-        this->player_rackets[0].spring = this->create_and_query_spring(m1, m2, 1, 40, 0.5);
+        this->player_rackets[0].spring = this->create_and_query_spring(m1, m2, 1, stiffness, damping);
 
         this->create_joint(this->query_masspoint(m2), this->player_rackets[0].platform);
     }
     
     // Player 2
     {
-        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, 1, false);
+        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, restitution, false);
         this->player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2, goals[1]->center_of_mass.y, goals[1]->center_of_mass.z), 0);
         int m2 = this->create_masspoint(Vec3(player_rackets[1].platform->center_of_mass.x + player_rackets[1].platform->size.x / 2, player_rackets[1].platform->center_of_mass.y, player_rackets[1].platform->center_of_mass.z), 1);
-        this->player_rackets[1].spring = this->create_and_query_spring(m1, m2, 1, 40, 0.5);
+        this->player_rackets[1].spring = this->create_and_query_spring(m1, m2, 1, stiffness, damping);
 
         this->create_joint(this->query_masspoint(m2), this->player_rackets[1].platform);
     }
@@ -711,8 +771,9 @@ void OpenProjectSimulator::setupBall()
     float heatgrid_height = heat_grid.height * heat_grid.scale;
     float ballScale = 1.f;
     float ballMass = 1.0f;
+    Real restitution = 2; // @@Volatile: This should match the racket's platform's restitution
 
-    this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, 1, false);
+    this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, restitution, false);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(0, 0, 1));
@@ -857,6 +918,16 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 }
 
 void OpenProjectSimulator::update_physics_engine(float dt) {    
+
+    //
+    // Update all joints.
+    //
+    for(int i = 0; i < this->joint_count; ++i) {
+        Joint & joint = this->joints[i];
+        joint.evaluate();
+    }
+
+
     //
     // Update the mass-spring-system using the Midpoint method.
     //
@@ -1062,8 +1133,8 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
                     //
 
                     Vec3 contact_point = Vec3(result.world_space_positions[k].x, result.world_space_positions[k].y, result.world_space_positions[k].z);
-                    Vec3 contact_point_velocity_lhs = lhs.get_world_space_velocity_at(contact_point);
-                    Vec3 contact_point_velocity_rhs = rhs.get_world_space_velocity_at(contact_point);
+                    Vec3 contact_point_velocity_lhs = lhs.get_velocity_at_world_space(contact_point);
+                    Vec3 contact_point_velocity_rhs = rhs.get_velocity_at_world_space(contact_point);
 
                     Vec3 relative_velocity = contact_point_velocity_lhs - contact_point_velocity_rhs;
                     Real rv_dot_normal = dot(relative_velocity, contact_normal);
@@ -1181,16 +1252,8 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
             }
         }
     }
-
-    //
-    // Update all joints.
-    //
-    for(int i = 0; i < this->joint_count; ++i) {
-        Joint & joint = this->joints[i];
-        joint.evaluate(dt);
-    }
     
-    //    this->debug_print();
+    //this->debug_print();
 }
 
 void OpenProjectSimulator::draw_game() {
@@ -1318,7 +1381,7 @@ void OpenProjectSimulator::draw_game() {
 void OpenProjectSimulator::debug_print() {
     printf("================================================================================\n");
 
-    if(this->draw_requests & DRAW_SPRINGS) {
+    if(this->draw_requests == DRAW_SPRINGS || this->draw_requests == DRAW_EVERYTHING) {
         printf(" > Masspoints:\n");
         for(int i = 0; i < this->masspoint_count; ++i) {
             Masspoint & masspoint = this->masspoints[i];
@@ -1334,7 +1397,7 @@ void OpenProjectSimulator::debug_print() {
         }
     }
 
-    if(this->draw_requests & DRAW_HEAT_MAP) {
+    if(this->draw_requests == DRAW_HEAT_MAP || this->draw_requests == DRAW_EVERYTHING) {
         printf(" > Heat Grid: width = %u, height = %u.\n", this->heat_grid.width, this->heat_grid.height);
 
         for(int y = 0; y < this->heat_grid.height; ++y) {
@@ -1350,7 +1413,7 @@ void OpenProjectSimulator::debug_print() {
         if(this->heat_grid.height) printf("\n");
     }
 
-    if(this->draw_requests & DRAW_RIGID_BODIES) {
+    if(this->draw_requests == DRAW_RIGID_BODIES || this->draw_requests == DRAW_EVERYTHING) {
         printf(" > Rigid Bodies:\n");
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
@@ -1479,6 +1542,12 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
     if(DXUTIsKeyDown(key_down)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
     }
+
+    //
+    // Move the endpoint to be on the same height as the player racket.
+    //
+    Masspoint * endpoint = this->query_masspoint(racket->spring->a);
+    endpoint->position.y = racket->platform->center_of_mass.y;
 }
 
 bool OpenProjectSimulator::trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other) {
