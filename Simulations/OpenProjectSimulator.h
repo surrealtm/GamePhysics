@@ -15,7 +15,7 @@
 #define GAME_SCENE            0x1
 #define RIGID_BODY_TEST_SCENE 0x2
 #define JOINT_TEST_SCENE      0x3
-#define ACTIVE_SCENE GAME_SCENE
+#define ACTIVE_SCENE JOINT_TEST_SCENE // nocheckin
 
 //
 // Simulation limits
@@ -78,7 +78,10 @@ struct Spring {
 	int a, b; // Indices into the Simulator's masspoint array.
 	Real stiffness;
 	Real initial_length, current_length;
+	Real damping; // The force is decreased by this factor so that the spring will slowly dampen to a halt. Value of 0 means no damping
 	Vec3 current_force_from_a_to_b;
+
+	void create(int a, int b, Real initial_length, Real stiffness, Real damping);
 };
 
 struct Masspoint {
@@ -145,14 +148,13 @@ struct Rigid_Body {
 // It is only present the frame after the collision happened (since the collision
 // detection happens after the game logic, but we want this info in the game logic).
 struct Trigger_Collision {
-	Rigid_Body *trigger;
-	Rigid_Body *other;
+	Rigid_Body * trigger;
+	Rigid_Body * other;
 };
 
-struct Player_Racket
-{
-	Rigid_Body* platform;
-	Spring* spring;
+struct Player_Racket {
+	Rigid_Body * platform;
+	Spring * spring;
 };
 
 //
@@ -229,7 +231,7 @@ public:
 	//
 
 	int create_masspoint(Vec3 position, Real mass);
-	int create_spring(int a, int b, Real initial_length, Real stiffness);
+	int create_spring(int a, int b, Real initial_length, Real stiffness, Real damping);
 	int create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
     int create_joint(Masspoint * masspoint, Rigid_Body * rigid_body);
     
@@ -262,7 +264,7 @@ private:
     Rigid_Body * create_and_query_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger);
 
     Spring * query_spring(int index);
-    Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness);
+    Spring * create_and_query_spring(int a, int b, Real initial_length, Real stiffness, Real damping);
 
     Masspoint * query_masspoint(int index);
     Masspoint * create_and_query_masspoint(Vec3 position, Real mass);
@@ -306,8 +308,7 @@ private:
 	Spring springs[MAX_SPRINGS];
 	int masspoint_count;
 	int spring_count;
-	float spring_damping; // 0 means no damping, 1 means complete damping
-
+	
 	//
 	// Rigid Bodies.
 	//
