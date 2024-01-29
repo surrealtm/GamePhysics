@@ -5,7 +5,7 @@
 //
 // Time step
 //
-#define SIMULATOR_UPDATES_PER_SECOND 100
+#define SIMULATOR_UPDATES_PER_SECOND 1000
 #define FIXED_DT (1.0f / SIMULATOR_UPDATES_PER_SECOND)
 #define USE_FIXED_DT true // :TimeStep
 
@@ -28,7 +28,7 @@
 //
 // Rigid body settings
 //
-#define RIGID_BODY_POSITION_ERROR_CORRECTION false
+#define RIGID_BODY_POSITION_ERROR_CORRECTION true
 #define RIGID_BODY_SLEEP_THRESHOLD (10 * FIXED_DT + FIXED_DT)
 
 //

@@ -732,7 +732,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     float heightPos = goals[0]->center_of_mass.y;
     const Real restitution = 2; // @@Volatile: This should match the ball's restitution.
     const Real stiffness = 40;
-    const Real damping   = 0.99;
+    const Real damping   = 1.5; // This doesn't really seem plausible, but because the springs are affected by a joint, we need a HIGH value to stop the springs from going absolutely nuts.
 
     // Player 1
     {
@@ -824,7 +824,7 @@ void OpenProjectSimulator::reset_after_goal() {
     this->ball->angular_velocity = Vec3(0, 0, 0);
     this->ball->angular_momentum = Vec3(0, 0, 0);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(1, 0, 0));
+    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
 
     // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
@@ -1576,7 +1576,7 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
     //
     // Apply a movement force when the player has pressed the respective keys to do so.
     //
-    const float speed = 5.f; // This is in meters / second
+    const float speed = 50.f; // This is in meters / second
 
     if(DXUTIsKeyDown(key_up)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
