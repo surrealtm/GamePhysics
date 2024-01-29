@@ -707,7 +707,7 @@ void OpenProjectSimulator::setup_joint_test() {
 
 void OpenProjectSimulator::setupHeatGrid()
 {
-    heat_grid.create(10, 10);
+    heat_grid.create(15, 11);
     
 }
 
@@ -716,8 +716,8 @@ void OpenProjectSimulator::setupWalls()
     float heatgrid_width = heat_grid.width * heat_grid.scale;
     float heatgrid_height = heat_grid.height * heat_grid.scale;
 
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 0, false);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2, 2, 1), 0, 0, false);
+    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2.9f, 0.8f, 1), 0, 0, false);
+    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2.9f, 0.8f, 1), 0, 0, false);
     wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -725,8 +725,8 @@ void OpenProjectSimulator::setupWalls()
     normal_walls[0] = wallNorth;
     normal_walls[1] = wallSouth;
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, true);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(2, heatgrid_height, 1), 0, 1, true);
+    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(0.9f, heatgrid_height + 1.2f, 1), 0, 1, true);
+    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(0.9f, heatgrid_height + 1.2f, 1), 0, 1, true);
     goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
@@ -743,7 +743,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
 
     // Player 1
     {
-        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, restitution, false);
+        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(0.9f, 3, 1), 1, restitution, false);
         this->player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(Vec3(goals[0]->center_of_mass.x + goals[0]->size.x / 2, goals[0]->center_of_mass.y, goals[0]->center_of_mass.z), 0);
@@ -755,7 +755,7 @@ void OpenProjectSimulator::setupPlayerPlatforms()
     
     // Player 2
     {
-        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 2, 1), 1, restitution, false);
+        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(0.9f, 3, 1), 1, restitution, false);
         this->player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     
         int m1 = this->create_masspoint(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2, goals[1]->center_of_mass.y, goals[1]->center_of_mass.z), 0);
@@ -780,10 +780,10 @@ void OpenProjectSimulator::setupBall()
     Real restitution = 2; // @@Volatile: This should match the racket's platform's restitution
 
     this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, restitution, false);
-    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x , goals[0]->center_of_mass.y , OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0)); // @Cleanup: Find a good initial speed for the ball.
+    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); // @Cleanup: Find a good initial speed for the ball.
     
 }
 
@@ -791,6 +791,7 @@ void OpenProjectSimulator::set_default_camera_position() {
     if(this->DUC) {
 #if ACTIVE_SCENE == GAME_SCENE
         const float lookat_size = 16.0f;
+
         
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
@@ -1341,10 +1342,43 @@ void OpenProjectSimulator::draw_game() {
     //
     // Draw all rigid bodies if requested.
     //
+
+    Vec3 playerOne_color = Vec3(0.8f,0,0);
+    Vec3 goalOne_color = Vec3(1,0.25f,0.25f);
+    Vec3 playerTwo_color = Vec3(0,0,0.8f);
+    Vec3 goalTwo_color = Vec3(0.25f,0.25f,1);
+    Vec3 wall_color = Vec3(1,1,1);
+    
     if(this->draw_requests == DRAW_RIGID_BODIES || this->draw_requests == DRAW_EVERYTHING) {
         for(int i = 0; i < this->rigid_body_count; ++i) {
             Rigid_Body & body = this->rigid_bodies[i];
-            this->DUC->setUpLighting(Vec3(0, 0, 0), body.albedo, 0.2, body.albedo);
+            switch(i)
+            {
+            case 0:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), wall_color, 0.2, wall_color);
+                break;
+            case 1:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), wall_color, 0.2, wall_color);
+                break;
+            case 2:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), goalOne_color, 0.2, goalOne_color);
+                break;
+            case 3:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), goalTwo_color, 0.2, goalTwo_color);
+                break;
+            case 4:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), playerOne_color, 0.2, playerOne_color);
+                break;
+            case 5:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), playerTwo_color, 0.2, playerTwo_color);
+                break;
+            default:
+                this->DUC->setUpLighting(Vec3(0, 0, 0), wall_color, 0.2, wall_color);
+                break;
+
+            }
+            
+            
             this->DUC->drawRigidBody(body.transformation * this->DUC->g_camera.GetWorldMatrix());
         }
     }
@@ -1355,16 +1389,16 @@ void OpenProjectSimulator::draw_game() {
     int j{ 0 };
     for (int i{ 0 }; i < score1; i++) {
         if (i < 5) {
-            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
             this->DUC->drawSphere(Vec3(-1.f + 0.7f * i, goals[1]->size.y + 3.f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
         }
         else if (i < 10) {
-            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
             this->DUC->drawSphere(Vec3(-1.f + 0.7f * j, goals[1]->size.y + 2.25f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
             j++;
         }
         else {
-            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0.8f, 0), 1, Vec3(0, 0.8f, 0));
+            this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
 			this->DUC->drawSphere(Vec3(-1.f + 0.75f * j, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
