@@ -224,19 +224,15 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="DiffusionSimulator.cpp" />
     <ClCompile Include="OpenProjectSimulator.cpp" />
     <ClCompile Include="sat.cpp" />
-    <ClCompile Include="TemplateSimulator.cpp" />
     <ClCompile Include="util\FFmpeg.cpp" />
     <ClCompile Include="util\util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DrawingUtilitiesClass.h" />
-    <ClInclude Include="DiffusionSimulator.h" />
     <ClInclude Include="sat.h" />
     <ClInclude Include="Simulator.h" />
-    <ClInclude Include="TemplateSimulator.h" />
     <ClInclude Include="util\FFmpeg.h" />
     <ClInclude Include="util\matrixbase.h" />
     <ClInclude Include="util\quaternion.h" />
