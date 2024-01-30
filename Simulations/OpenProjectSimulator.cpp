@@ -369,14 +369,22 @@ void Heat_Grid::reset() {
 void Heat_Grid::apply_boundary_condition() {
     const float boundary_value = 0.f;
 
-    for(int x = 0; x < this->width; ++x) {
-        this->set(x, 0, boundary_value);
-        this->set(x, this->height - 1, boundary_value);
-    }
-
-    for(int y = 1; y < this->height - 1; ++y) {
-        this->set(0, y, boundary_value);
-        this->set(this->width - 1, y, boundary_value);
+    for (int y = 0; y < this->height; ++y)
+    {
+        for (int x = 0; x < this->width; ++x)
+        {
+            if (x == 0 ||y == 0)
+            {
+                this->set(x, y, boundary_value);
+                continue;
+            }
+            
+            float value = this->get(x,y);
+            if (value < 0)
+            {
+                this->set(x, y, boundary_value);
+            }
+        }
     }
 }
 
@@ -402,12 +410,13 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
-float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
+std::array<int, 2> Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 {
     int grid_x = (world_x + scale/2) / scale;
     int grid_y = (world_y + scale/2) / scale;
 
-    return values + grid_y * width + grid_x;
+    return {grid_x, grid_y};
+    //return values + grid_y * width + grid_x;
 }
 
 
@@ -476,7 +485,6 @@ OpenProjectSimulator::OpenProjectSimulator() {
     this->stepping      = false;
     this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
-    this->heat_alpha    = 0.8f; // Half decay.
     setup_timing();
 }
 
@@ -586,7 +594,8 @@ int OpenProjectSimulator::create_spring(int a, int b, Real initial_length, Real 
     ++this->spring_count;
     return index;
 }
-
+
+
 int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(this->rigid_body_count < MAX_RIGID_BODIES);
     int index = this->rigid_body_count;
@@ -597,7 +606,8 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restituti
     
     ++this->rigid_body_count;
     return index;
-}
+}
+
 
 int OpenProjectSimulator::create_joint(Masspoint * masspoint, Rigid_Body * rigid_body) {
     assert(this->joint_count < MAX_JOINTS);
@@ -891,9 +901,22 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     }
 
     //get current position of ball on grid
-    float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
-    // increase speed of ball depending on temperature
-    //ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell; // nocheckin
+    array<int, 2> grid_pos = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    float const temp_cell = heat_grid.get(grid_pos[0], grid_pos[1]);
+    // skip if ball is in same cell as last frame
+    if (grid_pos[0] != heat_grid.previous_ball_position[0] || grid_pos[1] != heat_grid.previous_ball_position[1])
+    {
+        // increase speed of ball depending on temperature
+        // 0 = min temperatur -> offset divisor by ~ +1
+        const float ball_velocity_factor = 1 / ( 2 - heat_grid.max_velocity_factor_by_heat + temp_cell);
+        cout << "ball_velocity: " << dot(ball->linear_velocity, ball->linear_velocity) << endl;
+        if (dot(ball->linear_velocity, ball->linear_velocity) > 20.0f || ball_velocity_factor > 1.0f)
+        {
+            ball->linear_velocity *= ball_velocity_factor;
+        }
+
+        heat_grid.previous_ball_position = grid_pos;
+    }
     
     
     // Increase temperate of cell where the ball currently is
@@ -901,8 +924,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 
     // Each frame, we want to take out as much energy as we add, so that the total "energy count" remains
     // the frame.
-    const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
-    
+    //const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
+    const float decrease = this->heat_grid.heat_rise_by_ball / 48;
+
     for(int i = 0; i < this->heat_grid.width; ++i) {
         for(int j = 0; j < this->heat_grid.height; ++j) {
             float value = this->heat_grid.get(i, j);
@@ -912,7 +936,7 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     }
 
     this->heat_grid.apply_boundary_condition();
-    *temp_cell += heat_grid.heat_rise_by_ball;
+    heat_grid.set(grid_pos[0], grid_pos[1],temp_cell +  heat_grid.heat_rise_by_ball);
     
     //
     // Move the player rackets depending on player input -> MANU
@@ -920,11 +944,6 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 
     this->move_player_racket(&this->player_rackets[0], 'W', 'S');
     this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN);
-
-    //
-    // @Incomplete: Speed up or slow down the ball depending on the current
-    // cell temperature -> DENNIS
-    //
 }
 
 void OpenProjectSimulator::update_physics_engine(float dt) {    
@@ -993,8 +1012,8 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
 
         float i_dt = 1.f / dt;
         float theta = 0.5f;
-        float Fx = this->heat_alpha * dt / (dx * dx);
-        float Fy = this->heat_alpha * dt / (dy * dy);
+        float Fx = heat_grid.heat_alpha * dt / (dx * dx);
+        float Fy = heat_grid.heat_alpha * dt / (dy * dy);
 
 
 #define index(x, y) ((y) * this->heat_grid.width + (x))
@@ -1025,7 +1044,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
                 A.set_element(i, index(x, y + 1), -theta * Fy);
 
                 b[i] = this->heat_grid.get(x, y) +
-                    (1 - this->heat_alpha) * (
+                    (1 - heat_grid.heat_alpha) * (
                         Fx * (this->heat_grid.get(x + 1, y) - 2 * this->heat_grid.get(x, y) + this->heat_grid.get(x - 1, y)) +
                         Fy * (this->heat_grid.get(x, y + 1) - 2 * this->heat_grid.get(x, y) + this->heat_grid.get(x, y - 1))
                     );
