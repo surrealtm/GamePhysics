@@ -776,7 +776,12 @@ void OpenProjectSimulator::setupBall()
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x , goals[0]->center_of_mass.y , OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); // @Cleanup: Find a good initial speed for the ball.
+
+    // @Cleanup: Find a good initial speed for the ball.
+    if (std::rand() % 2) //not working
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); 
+    else
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 1, 0));
     
 }
 
@@ -818,13 +823,16 @@ void OpenProjectSimulator::setup_game() {
     this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
-void OpenProjectSimulator::reset_after_goal() {
+void OpenProjectSimulator::reset_after_goal(bool player1) {
     // Reset ball
     this->ball->linear_velocity = Vec3(0, 0, 0);
     this->ball->angular_velocity = Vec3(0, 0, 0);
     this->ball->angular_momentum = Vec3(0, 0, 0);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
+    if (player1)
+		this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
+	else
+		this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
 
     // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
@@ -845,10 +853,17 @@ void OpenProjectSimulator::reset_after_goal() {
         m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
     }
+
+    //Reset heat grid
+    for (int i = 0; i < this->heat_grid.width; ++i) {
+        for (int j = 0; j < this->heat_grid.height; ++j) {
+            this->heat_grid.set(i, j, 0);
+        }
+    }
 }
 
-void OpenProjectSimulator::reset_after_win() {
-	this->reset_after_goal();
+void OpenProjectSimulator::reset_after_win(bool player1) {
+	this->reset_after_goal(player1);
     this->score1 = 0;
     this->score2 = 0;
 }
@@ -870,9 +885,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
             score1++;
             if (score1 >= WIN_SCORE) {
                 printf("Player one has won!\n");
-                reset_after_win();
+                reset_after_win(true);
             } else
-                reset_after_goal();
+                reset_after_goal(true);
         }
     }
 
@@ -884,9 +899,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
             score2++;
             if (score2 >= WIN_SCORE) {
 				printf("Player two has won!\n");
-                reset_after_win();
+                reset_after_win(false);
             } else
-                reset_after_goal();
+                reset_after_goal(false);
         }
     }
 

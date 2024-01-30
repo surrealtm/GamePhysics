@@ -247,8 +247,8 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
-	void reset_after_goal();
-	void reset_after_win();
+	void reset_after_goal(bool player1);
+	void reset_after_win(bool player1);
 	
 	void set_default_camera_position();
 	void setup_game();
