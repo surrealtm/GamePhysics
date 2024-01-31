@@ -275,7 +275,7 @@ private:
 	void calculate_masspoint_positions(float dt);
 	void calculate_masspoint_velocities(float dt);
 
-	void move_player_racket(Player_Racket * racket, int key_up, int key_down);
+	void move_player_racket(Player_Racket * racket, int key_up, int key_down, int key_side, int player);
     bool trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other);
     
     //

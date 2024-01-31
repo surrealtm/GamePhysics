@@ -936,8 +936,8 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     // Move the player rackets depending on player input -> MANU
     //
 
-    this->move_player_racket(&this->player_rackets[0], 'W', 'S');
-    this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN);
+    this->move_player_racket(&this->player_rackets[0], 'W', 'S', 'A', 0);
+    this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN, VK_RIGHT, 1);
 
     //
     // @Incomplete: Speed up or slow down the ball depending on the current
@@ -1585,7 +1585,7 @@ void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
     }
 }
 
-void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
+void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down, int key_side, int player) {
     //
     // Apply a friction force to the racket to stop it from moving.
     //
@@ -1595,6 +1595,7 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
     // Apply a movement force when the player has pressed the respective keys to do so.
     //
     const float speed = 50.f; // This is in meters / second
+    const float horizontal_speed = 15.f;
 
     if(DXUTIsKeyDown(key_up)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
@@ -1602,6 +1603,13 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
 
     if(DXUTIsKeyDown(key_down)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
+    }
+
+    if (DXUTIsKeyDown(key_side) && player == 0) {
+		racket->platform->apply_force(racket->platform->center_of_mass, Vec3(-horizontal_speed, 0, 0));
+    }
+    else if (DXUTIsKeyDown(key_side) && player == 1) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(horizontal_speed, 0, 0));
     }
 
     //
