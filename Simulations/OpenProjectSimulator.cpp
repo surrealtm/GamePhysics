@@ -586,7 +586,8 @@ int OpenProjectSimulator::create_spring(int a, int b, Real initial_length, Real 
     ++this->spring_count;
     return index;
 }
-
+
+
 int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restitution, bool is_trigger) {
     assert(this->rigid_body_count < MAX_RIGID_BODIES);
     int index = this->rigid_body_count;
@@ -597,7 +598,8 @@ int OpenProjectSimulator::create_rigid_body(Vec3 size, Real mass, Real restituti
     
     ++this->rigid_body_count;
     return index;
-}
+}
+
 
 int OpenProjectSimulator::create_joint(Masspoint * masspoint, Rigid_Body * rigid_body) {
     assert(this->joint_count < MAX_JOINTS);
@@ -788,11 +790,12 @@ void OpenProjectSimulator::setupBall()
 void OpenProjectSimulator::set_default_camera_position() {
     if(this->DUC) {
 #if ACTIVE_SCENE == GAME_SCENE
-        const float lookat_size = 16.0f;
+        const float lookat_size = 1.0f;
 
         
         this->DUC->g_camera.Reset();
-        this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+        this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -30.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+        this->DUC->g_camera.SetModelCenter(XMFLOAT3{7,6,5});
 #else
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
