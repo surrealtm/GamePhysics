@@ -795,7 +795,7 @@ void OpenProjectSimulator::set_default_camera_position() {
         
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -30.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
-        this->DUC->g_camera.SetModelCenter(XMFLOAT3{7,6,5});
+        this->DUC->g_camera.SetModelCenter(XMFLOAT3{float(heat_grid.width / 2),float(heat_grid.height / 2) + 1,5});
 #else
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
