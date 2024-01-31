@@ -383,6 +383,9 @@ void Heat_Grid::apply_boundary_condition() {
             if (value < 0)
             {
                 this->set(x, y, boundary_value);
+            }else if(value > max_temperature)
+            {
+                this->set(x,y, max_temperature);
             }
         }
     }
@@ -903,22 +906,16 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     //get current position of ball on grid
     array<int, 2> grid_pos = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
     float const temp_cell = heat_grid.get(grid_pos[0], grid_pos[1]);
-    // skip if ball is in same cell as last frame
-    if (grid_pos[0] != heat_grid.previous_ball_position[0] || grid_pos[1] != heat_grid.previous_ball_position[1])
-    {
-        // increase speed of ball depending on temperature
-        // 0 = min temperatur -> offset divisor by ~ +1
-        const float ball_velocity_factor = 1 / ( 2 - heat_grid.max_velocity_factor_by_heat + temp_cell);
-        cout << "ball_velocity: " << dot(ball->linear_velocity, ball->linear_velocity) << endl;
-        if (dot(ball->linear_velocity, ball->linear_velocity) > 20.0f || ball_velocity_factor > 1.0f)
-        {
-            ball->linear_velocity *= ball_velocity_factor;
-        }
 
-        heat_grid.previous_ball_position = grid_pos;
-    }
+    // increase speed of ball depending on temperature
+    // 0 = min temperatur -> max_velocity
+    // max temperatur -> min_velocity
     
-    
+    // solve m * temp_cell + t = amplifier
+    const float amplifier = heat_grid.m * temp_cell + heat_grid.t;
+
+    ball->apply_force(ball->center_of_mass, ball->linear_velocity * (1-amplifier));
+
     // Increase temperate of cell where the ball currently is
     // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
 
@@ -929,8 +926,7 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 
     for(int i = 0; i < this->heat_grid.width; ++i) {
         for(int j = 0; j < this->heat_grid.height; ++j) {
-            float value = this->heat_grid.get(i, j);
-            if(value > 0.0f) value -= decrease;
+            float value = this->heat_grid.get(i, j) - decrease;
             this->heat_grid.set(i, j, value);
         }
     }

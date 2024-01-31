@@ -168,9 +168,12 @@ struct Heat_Grid {
 	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
 	float heat_alpha = 0.1f; // How fast temperate is diffused. Higher value means faster diffusion.
+	float max_temperature = 1.2f;
 	float heat_rise_by_ball = 0.002f;
-	float max_velocity_factor_by_heat = 1.03f;
-	array<int, 2> previous_ball_position = { 0, 0 };
+	float max_heat_amplifier = 2.0f;
+	float min_heat_amplifier = 1.5f;
+	const float m = (min_heat_amplifier - max_heat_amplifier) / max_temperature;
+	const float t = max_heat_amplifier;
 	
 	void create(int width, int height);
 	void destroy();
