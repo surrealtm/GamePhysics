@@ -51,6 +51,7 @@
 
 #define WIN_SCORE 11
 #define GOAL_DELAY 0.1f // Time for collision detection sleep between goal and scene reset; change based on DT 
+#define WIN_DELAY 2.0f // Time for collision detection sleep between win and scene reset; change based on DT
 
 //
 // Utility Functions.
@@ -267,6 +268,7 @@ public:
 	void setupBall();
 	void reset_after_goal(bool player1);
 	void reset_after_win(bool player1);
+	void reset_except_ball();
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -310,11 +312,19 @@ private:
 	double time_factor; // Slows down the time for debugging by evaluation steps at a slower interval.
 	bool running; // The UI can toggle this for debugging purposes. The game loop will not be executed when this is false.
     bool stepping; // The UI can toggle this for debugging purposes. 'running' will be set to false after every step.
+	string textforBar;
+	string textP1;
+	string textP1Control1;
+	string textP1Control2;
+	string textP2;
+	string textP2Control1;
+	string textP2Control2;
     
 	//
 	// General stuff.
 	//
 	TwBar *tweak_bar;
+	TwBar *winbar;
 	DrawRequest draw_requests;
 	std::vector<Vec3> debug_draw_points; // Debug: Can be used to draw anything in immediate mode.
 	float gravity;
@@ -351,7 +361,12 @@ private:
 	Rigid_Body* ball;
 	int score1;
 	int score2;
+	bool winner;
 	double goalTimeStamp;
+	double winTimeStamp;
+
+	float heat_accelleration_for_ball;
+
 	
 	Player_Racket player_rackets[2];
     

@@ -494,7 +494,13 @@ OpenProjectSimulator::OpenProjectSimulator() {
     this->stepping      = false;
     this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
-    srand(time(0));
+    this->textforBar    = "";
+    this->textP1        = "";
+    this->textP1Control1= "W,S";
+    this->textP1Control2= "A";
+    this->textP2        = "";
+    this->textP2Control1= "^, v";
+    this->textP2Control2= ">";
     setup_timing();
 }
 
@@ -514,7 +520,16 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
     TwAddVarRW(this->tweak_bar, "Stepping", TW_TYPE_BOOLCPP, &this->stepping, "");
 	TwAddVarRW(this->tweak_bar, "DrawRequests", TW_TYPE_DRAW_REQUESTS, &this->draw_requests, "");
     TwAddVarRW(this->tweak_bar, "Time Factor", TW_TYPE_DOUBLE, &this->time_factor, "min=0.001 max=10 step=0.001");
-
+    TwAddVarRW(this->tweak_bar, " ", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "=========", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "Player 1", TW_TYPE_STDSTRING, &this->textP1, "");
+    TwAddVarRW(this->tweak_bar, "Move", TW_TYPE_STDSTRING, &this->textP1Control1, "");
+    TwAddVarRW(this->tweak_bar, "Charge", TW_TYPE_STDSTRING, &this->textP1Control2, "");
+    TwAddVarRW(this->tweak_bar, "---------", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "Player 2", TW_TYPE_STDSTRING, &this->textP2, "");
+    TwAddVarRW(this->tweak_bar, "Move ", TW_TYPE_STDSTRING, &this->textP2Control1, "");
+    TwAddVarRW(this->tweak_bar, "Charge ", TW_TYPE_STDSTRING, &this->textP2Control2, "");
+    TwAddVarRW(this->tweak_bar, "========", TW_TYPE_STDSTRING, &this->textforBar, "");
     this->set_default_camera_position();
 }
 
@@ -522,7 +537,8 @@ void OpenProjectSimulator::reset() {
     this->masspoint_count  = 0;
     this->spring_count     = 0;
     this->rigid_body_count = 0;
-    this->joint_count      = 0;    
+    this->joint_count      = 0;
+    TwDeleteBar(this->winbar);
     this->setup_game();    
 }
 
@@ -848,6 +864,8 @@ void OpenProjectSimulator::setup_game() {
     this->score1 = 0;
     this->score2 = 0;
     this->goalTimeStamp = 0;
+    this->winTimeStamp = 0;
+    this->winner = 0;
 #elif ACTIVE_SCENE == RIGID_BODY_TEST_SCENE
     this->setup_rigid_body_test();
 #elif ACTIVE_SCENE == JOINT_TEST_SCENE
@@ -920,15 +938,45 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 }
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
-	this->reset_after_goal(player1);
-    this->score1 = 0;
-    this->score2 = 0;
+
+    this->ball->linear_velocity = Vec3(0, 0, 0);
+    this->ball->angular_velocity = Vec3(0, 0, 0);
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+
+    reset_except_ball();
+
+    winner = player1;
+    if(player1)
+    {
+        this->winbar = TwNewBar("Winner");
+        TwAddVarRW(this->winbar, "Player1", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddVarRW(this->winbar, "Won", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddButton(this->winbar, "Restart", [](void * data){ tw_reset_button_callback(data); }, this, "");
+
+        
+    }else
+    {
+        this->winbar = TwNewBar("Winner");
+        TwAddVarRW(this->winbar, "Player2", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddVarRW(this->winbar, "Won", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddButton(this->winbar, "Restart", [](void * data){ tw_reset_button_callback(data); }, this, "");
+
+    }
+    winTimeStamp = get_current_time_in_milliseconds();
 }
 
 void OpenProjectSimulator::update_game_logic(float dt) {
 #if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
+    /*if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
+    {
+		this->reset_after_goal(winner);
+		this->score1 = 0;
+		this->score2 = 0;
+		winTimeStamp = 0;
+        TwDeleteBar(this->winbar);
+	}*/
 
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
