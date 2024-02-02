@@ -292,6 +292,13 @@ private:
 	double time_factor; // Slows down the time for debugging by evaluation steps at a slower interval.
 	bool running; // The UI can toggle this for debugging purposes. The game loop will not be executed when this is false.
     bool stepping; // The UI can toggle this for debugging purposes. 'running' will be set to false after every step.
+	string textforBar;
+	string textP1;
+	string textP1Control1;
+	string textP1Control2;
+	string textP2;
+	string textP2Control1;
+	string textP2Control2;
     
 	//
 	// General stuff.

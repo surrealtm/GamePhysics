@@ -477,6 +477,13 @@ OpenProjectSimulator::OpenProjectSimulator() {
     this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
     this->heat_alpha    = 0.8f; // Half decay.
+    this->textforBar    = "";
+    this->textP1        = "";
+    this->textP1Control1= "W,S";
+    this->textP1Control2= "A";
+    this->textP2        = "";
+    this->textP2Control1= "↑, ↓";
+    this->textP2Control2= "→";
     setup_timing();
 }
 
@@ -496,7 +503,16 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
     TwAddVarRW(this->tweak_bar, "Stepping", TW_TYPE_BOOLCPP, &this->stepping, "");
 	TwAddVarRW(this->tweak_bar, "DrawRequests", TW_TYPE_DRAW_REQUESTS, &this->draw_requests, "");
     TwAddVarRW(this->tweak_bar, "Time Factor", TW_TYPE_DOUBLE, &this->time_factor, "min=0.001 max=10 step=0.001");
-
+    TwAddVarRW(this->tweak_bar, " ", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "=========", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "Player 1", TW_TYPE_STDSTRING, &this->textP1, "");
+    TwAddVarRW(this->tweak_bar, "Movement", TW_TYPE_STDSTRING, &this->textP1Control1, "");
+    TwAddVarRW(this->tweak_bar, "Shooting", TW_TYPE_STDSTRING, &this->textP1Control2, "");
+    TwAddVarRW(this->tweak_bar, "---------", TW_TYPE_STDSTRING, &this->textforBar, "");
+    TwAddVarRW(this->tweak_bar, "Player 2", TW_TYPE_STDSTRING, &this->textP2, "");
+    TwAddVarRW(this->tweak_bar, "Movement ", TW_TYPE_STDSTRING, &this->textP2Control1, "");
+    TwAddVarRW(this->tweak_bar, "Shooting ", TW_TYPE_STDSTRING, &this->textP2Control2, "");
+    TwAddVarRW(this->tweak_bar, "========", TW_TYPE_STDSTRING, &this->textforBar, "");
     this->set_default_camera_position();
 }
 
