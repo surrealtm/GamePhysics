@@ -35,8 +35,13 @@
 //
 // Offset constants
 //
-#define OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
-#define OFFSET_PLAYERACKETS 1.5f // Offset of player rackets to wall
+#define Z_OFFSET_HEAT_GRID -1.f // Offset to heat grid for walls, ball, player rackets
+#define HORIZONTAL_OFFSET_PLAYER_RACKETS 1.5f // Offset of player rackets to wall
+
+//
+// Some other constants
+//
+#define INITIAL_BALL_IMPULSE Vec3(10, 0, 0)
 
 //
 // Print helpers
@@ -165,13 +170,18 @@ struct Player_Racket {
 
 struct Heat_Grid {
 	int width = 0, height = 0;
-	int scale = 1; // scaling of each cell
+	int scale = 1; // World space scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
-	float heat_alpha = 0.1f; // How fast temperate is diffused. Higher value means faster diffusion.
+
 	float max_temperature = 1.2f;
+	float min_temperature = 0.f;
+    float boundary_temperature = 0.f;
+    
+    float heat_alpha = 0.1f; // How fast temperate is diffused. Higher value means faster diffusion.
 	float heat_rise_by_ball = 0.002f;
 	float max_heat_amplifier = 2.0f;
 	float min_heat_amplifier = 1.5f;
+
 	const float m = (min_heat_amplifier - max_heat_amplifier) / max_temperature;
 	const float t = max_heat_amplifier;
 	
@@ -180,6 +190,7 @@ struct Heat_Grid {
 	void reset();
 	void apply_boundary_condition();
 	void randomize();
+    void set_all_to_full_for_testing();
 	void set(int x, int y, float value);
 	float get(int x, int y);
 	std::array<int, 2> get_cell_to_worldpos(float world_x, float world_y);

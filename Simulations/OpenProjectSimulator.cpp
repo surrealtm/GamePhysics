@@ -3,6 +3,14 @@
 #include "sat.h"
 
 //
+// @Incomplete:
+//   * Try to make the ball much lighter, so that the rackets don't bounce that much
+//   * Add restitution to the north and south walls so that the ball doesn't get stuck
+//   * Make the ball not slow down instantly
+//   * Increase the spring damping so that the rackets don't spring as much
+//
+
+//
 // Utility Functions
 //
 
@@ -369,23 +377,13 @@ void Heat_Grid::reset() {
 void Heat_Grid::apply_boundary_condition() {
     const float boundary_value = 0.f;
 
-    for (int y = 0; y < this->height; ++y)
-    {
-        for (int x = 0; x < this->width; ++x)
-        {
-            if (x == 0 ||y == 0)
-            {
-                this->set(x, y, boundary_value);
-                continue;
-            }
-            
-            float value = this->get(x,y);
-            if (value < 0)
-            {
-                this->set(x, y, boundary_value);
-            }else if(value > max_temperature)
-            {
-                this->set(x,y, max_temperature);
+    for(int y = 0; y < this->height; ++y) {
+        for(int x = 0; x < this->width; ++x) {
+            if(x == 0 || y == 0 || x == this->width - 1 || y == this->height - 1) {
+                this->set(x, y, this->boundary_temperature);
+            } else {            
+                float value = this->get(x,y);
+                this->set(x, y, clamp_float(value, this->min_temperature, this->max_temperature));
             }
         }
     }
@@ -399,6 +397,14 @@ void Heat_Grid::randomize() {
     }
 
     this->apply_boundary_condition();
+}
+
+void Heat_Grid::set_all_to_full_for_testing() {
+    for(int y = 0; y < this->height; ++y) {
+        for(int x = 0; x < this->width; ++x) {
+            this->set(x, y, 1);
+        }
+    }
 }
 
 void Heat_Grid::set(int x, int y, float value) {
@@ -488,6 +494,7 @@ OpenProjectSimulator::OpenProjectSimulator() {
     this->stepping      = false;
     this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
+    srand(time(0));
     setup_timing();
 }
 
@@ -711,64 +718,90 @@ void OpenProjectSimulator::setup_joint_test() {
     this->gravity = -10;
 }
 
-void OpenProjectSimulator::setupHeatGrid()
-{
-    heat_grid.create(15, 11);
-    
+void OpenProjectSimulator::setupHeatGrid() {
+    this->heat_grid.create(15, 11);    
 }
 
 void OpenProjectSimulator::setupWalls()
 {
-    float heatgrid_width = heat_grid.width * heat_grid.scale;
-    float heatgrid_height = heat_grid.height * heat_grid.scale;
-
-    Rigid_Body *wallNorth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2.9f, 0.8f, 1), 0, 0, false);
-    Rigid_Body *wallSouth = this->create_and_query_rigid_body(Vec3(heatgrid_width + 2.9f, 0.8f, 1), 0, 0, false);
-    wallNorth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, heatgrid_height + 0.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    wallSouth->warp(Vec3((heatgrid_width-heat_grid.scale) / 2, -1.5, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-
-
-    normal_walls[0] = wallNorth;
-    normal_walls[1] = wallSouth;
+    // World Space Boundaries of the Heat Grid
+    Real heatgrid_bottom = this->heat_grid.scale / 2;
+    Real heatgrid_top    = heatgrid_bottom + (this->heat_grid.height - 1) * this->heat_grid.scale;
+    Real heatgrid_left   = this->heat_grid.scale / 2;
+    Real heatgrid_right  = heatgrid_left + (this->heat_grid.width - 1) * this->heat_grid.scale;
+    Real heatgrid_width  = heatgrid_right - heatgrid_left;
+    Real heatgrid_height = heatgrid_top - heatgrid_bottom;
+    Vec3 heatgrid_center  = Vec3((heatgrid_left + heatgrid_right) / 2, (heatgrid_bottom + heatgrid_top) / 2, Z_OFFSET_HEAT_GRID);
     
-    Rigid_Body *goalLeft  = this->create_and_query_rigid_body(Vec3(0.9f, heatgrid_height + 1.2f, 1), 0, 1, true);
-    Rigid_Body *goalRight = this->create_and_query_rigid_body(Vec3(0.9f, heatgrid_height + 1.2f, 1), 0, 1, true);
-    goalLeft->warp(Vec3(-1.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    goalRight->warp(Vec3(heatgrid_width + 0.5, (heatgrid_height - heat_grid.scale)/2, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    // Set up the top and bottom walls to perfectly border the Heat Grid.
+    {
+        Real enclosing_width = heatgrid_width + this->heat_grid.scale; // We also want to cover the goals on the left and right
+        this->normal_walls[0] = this->create_and_query_rigid_body(Vec3(enclosing_width, this->heat_grid.scale, 1), 0, 0, false);
+        this->normal_walls[1] = this->create_and_query_rigid_body(Vec3(enclosing_width, this->heat_grid.scale, 1), 0, 0, false);
+        this->normal_walls[0]->warp(Vec3(heatgrid_center.x, heatgrid_top    + this->heat_grid.scale / 2, heatgrid_center.z), Quat(0, 0, 0, 1));
+        this->normal_walls[1]->warp(Vec3(heatgrid_center.x, heatgrid_bottom - this->heat_grid.scale / 2, heatgrid_center.z), Quat(0, 0, 0, 1));
+    }
 
-    goals[0] = goalLeft;
-    goals[1] = goalRight;
+    // Set up the goals (walls to the left and right)
+    {
+        Real enclosed_height = heatgrid_height - this->heat_grid.scale; // The walls cover the top-most cells.
+        this->goals[0] = this->create_and_query_rigid_body(Vec3(1, enclosed_height, 1), 0, 1, true);
+        this->goals[1] = this->create_and_query_rigid_body(Vec3(1, enclosed_height, 1), 0, 1, true);
+        this->goals[0]->warp(Vec3(heatgrid_left,  heatgrid_center.y, heatgrid_center.z), Quat(0, 0, 0, 1));
+        this->goals[1]->warp(Vec3(heatgrid_right, heatgrid_center.y, heatgrid_center.z), Quat(0, 0, 0, 1));
+    }
 }
 
 void OpenProjectSimulator::setupPlayerPlatforms()
 {
-    float heightPos = goals[0]->center_of_mass.y;
     const Real restitution = 2; // @@Volatile: This should match the ball's restitution.
-    const Real stiffness = 40;
-    const Real damping   = 1.5; // This doesn't really seem plausible, but because the springs are affected by a joint, we need a HIGH value to stop the springs from going absolutely nuts.
+    const Real stiffness   = 40;
+    const Real damping     = 10; // This doesn't really seem plausible, but because the springs are affected by a joint, we need a HIGH value to stop the springs from going absolutely nuts.
 
     // Player 1
     {
-        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(0.9f, 3, 1), 1, restitution, false);
-        this->player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    
-        int m1 = this->create_masspoint(Vec3(goals[0]->center_of_mass.x + goals[0]->size.x / 2, goals[0]->center_of_mass.y, goals[0]->center_of_mass.z), 0);
-        int m2 = this->create_masspoint(Vec3(player_rackets[0].platform->center_of_mass.x - player_rackets[0].platform->size.x / 2, player_rackets[0].platform->center_of_mass.y, player_rackets[0].platform->center_of_mass.z) , 1);
-        this->player_rackets[0].spring = this->create_and_query_spring(m1, m2, 1, stiffness, damping);
+        this->player_rackets[0].platform = this->create_and_query_rigid_body(Vec3(1, 3, 1), 1, restitution, false);
+        this->player_rackets[0].platform->warp(Vec3(this->goals[0]->center_of_mass.x + this->goals[0]->size.x / 2 + HORIZONTAL_OFFSET_PLAYER_RACKETS, 
+                                                    this->goals[0]->center_of_mass.y, 
+                                                    this->goals[0]->center_of_mass.z), 
+                                               Quat(0, 0, 0, 1));
 
-        this->create_joint(this->query_masspoint(m2), this->player_rackets[0].platform);
+        Vec3 masspoint_1_position = Vec3(this->goals[0]->center_of_mass.x + this->goals[0]->size.x / 2,
+                                         this->player_rackets[0].platform->center_of_mass.y,
+                                         this->player_rackets[0].platform->center_of_mass.z);
+        Vec3 masspoint_2_position = Vec3(this->player_rackets[0].platform->center_of_mass.x - this->player_rackets[0].platform->size.x / 2,
+                                         this->player_rackets[0].platform->center_of_mass.y,
+                                         this->player_rackets[0].platform->center_of_mass.z);
+        
+        int masspoint_1 = this->create_masspoint(masspoint_1_position, 0);
+        int masspoint_2 = this->create_masspoint(masspoint_2_position, 1);
+        
+        this->player_rackets[0].spring = this->create_and_query_spring(masspoint_1, masspoint_2, norm(masspoint_2_position - masspoint_1_position), stiffness, damping);
+
+        this->create_joint(this->query_masspoint(masspoint_2), this->player_rackets[0].platform);
     }
     
     // Player 2
     {
-        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(0.9f, 3, 1), 1, restitution, false);
-        this->player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    
-        int m1 = this->create_masspoint(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2, goals[1]->center_of_mass.y, goals[1]->center_of_mass.z), 0);
-        int m2 = this->create_masspoint(Vec3(player_rackets[1].platform->center_of_mass.x + player_rackets[1].platform->size.x / 2, player_rackets[1].platform->center_of_mass.y, player_rackets[1].platform->center_of_mass.z), 1);
-        this->player_rackets[1].spring = this->create_and_query_spring(m1, m2, 1, stiffness, damping);
+        this->player_rackets[1].platform = this->create_and_query_rigid_body(Vec3(1, 3, 1), 1, restitution, false);
+        this->player_rackets[1].platform->warp(Vec3(this->goals[1]->center_of_mass.x - this->goals[1]->size.x / 2 - HORIZONTAL_OFFSET_PLAYER_RACKETS, 
+                                                    this->goals[1]->center_of_mass.y, 
+                                                    this->goals[1]->center_of_mass.z), 
+                                               Quat(0, 0, 0, 1));
 
-        this->create_joint(this->query_masspoint(m2), this->player_rackets[1].platform);
+        Vec3 masspoint_1_position = Vec3(this->goals[1]->center_of_mass.x - this->goals[1]->size.x / 2,
+                                         this->player_rackets[1].platform->center_of_mass.y,
+                                         this->player_rackets[1].platform->center_of_mass.z);
+        Vec3 masspoint_2_position = Vec3(this->player_rackets[1].platform->center_of_mass.x + this->player_rackets[1].platform->size.x / 2,
+                                         this->player_rackets[1].platform->center_of_mass.y,
+                                         this->player_rackets[1].platform->center_of_mass.z);
+        
+        int masspoint_1 = this->create_masspoint(masspoint_1_position, 0);
+        int masspoint_2 = this->create_masspoint(masspoint_2_position, 1);
+        
+        this->player_rackets[1].spring = this->create_and_query_spring(masspoint_1, masspoint_2, norm(masspoint_2_position - masspoint_1_position), stiffness, damping);
+        
+        this->create_joint(this->query_masspoint(masspoint_2), this->player_rackets[1].platform);
     }
 
     for (auto racket : this->player_rackets) {
@@ -779,23 +812,13 @@ void OpenProjectSimulator::setupPlayerPlatforms()
 
 void OpenProjectSimulator::setupBall()
 {
-    float heatgrid_width = heat_grid.width * heat_grid.scale;
-    float heatgrid_height = heat_grid.height * heat_grid.scale;
-    float ballScale = 1.f;
-    float ballMass = 1.0f;
-    Real restitution = 2; // @@Volatile: This should match the racket's platform's restitution
+    const Real ballScale   = 1.0;
+    const Real ballMass    = 1.0; // @Cleanup: Maybe decrease to make the ball faster?
+    const Real restitution = 2; // @@Volatile: This should match the racket's platform's restitution
 
-    this->ball = this->create_and_query_rigid_body(Vec3(0.75f, 0.75f, ballScale), ballMass, restitution, false);
-    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x , goals[0]->center_of_mass.y , OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    this->ball = this->create_and_query_rigid_body(Vec3(ballScale), ballMass, restitution, false);
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(0, 0, 1));
-
-    // @Cleanup: Find a good initial speed for the ball.
-    if (std::rand() % 2) //not working
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); 
-    else
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 1, 0));
-    
 }
 
 void OpenProjectSimulator::set_default_camera_position() {
@@ -820,6 +843,7 @@ void OpenProjectSimulator::setup_game() {
     this->setupWalls();
     this->setupPlayerPlatforms();
     this->setupBall();
+    this->reset_after_goal(std::rand() % 2);
     this->gravity = 0;
     this->score1 = 0;
     this->score2 = 0;
@@ -838,42 +862,61 @@ void OpenProjectSimulator::setup_game() {
 }
 
 void OpenProjectSimulator::reset_after_goal(bool player1) {
-    // Reset ball
-    this->ball->linear_velocity = Vec3(0, 0, 0);
-    this->ball->angular_velocity = Vec3(0, 0, 0);
-    this->ball->angular_momentum = Vec3(0, 0, 0);
-    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    //
+    // Reset the ball
+    //
+    this->ball->warp(Vec3(this->normal_walls[0]->center_of_mass.x, this->goals[0]->center_of_mass.y, Z_OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     if (player1)
-		this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
-	else
-		this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
+        this->ball->apply_impulse(this->ball->center_of_mass, INITIAL_BALL_IMPULSE);
+    else
+        this->ball->apply_impulse(this->ball->center_of_mass, -INITIAL_BALL_IMPULSE);    
 
+    //
     // Reset the player rackets
-    float heightPos = goals[0]->center_of_mass.y;
-    player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-	player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-
-    // Reset the player springs
+    // @Cut'n'Paste: From setupPlayerPlatforms
+    //
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[0].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[0].spring->b);
-        m1->warp(this->goals[0]->center_of_mass + Vec3(this->goals[0]->size.x / 2, 0, 0));
-        m2->warp(this->player_rackets[0].platform->center_of_mass - Vec3(this->player_rackets[0].platform->size.x / 2, 0, 0));
+        this->player_rackets[0].platform->warp(Vec3(this->goals[0]->center_of_mass.x + this->goals[0]->size.x / 2 + HORIZONTAL_OFFSET_PLAYER_RACKETS, 
+                                                    this->goals[0]->center_of_mass.y, 
+                                                    this->goals[0]->center_of_mass.z), 
+                                               Quat(0, 0, 0, 1));
+
+        Vec3 masspoint_1_position = Vec3(this->goals[0]->center_of_mass.x + this->goals[0]->size.x / 2, this->goals[0]->center_of_mass.y, this->goals[0]->center_of_mass.z);
+
+        Vec3 masspoint_2_position = Vec3(this->player_rackets[0].platform->center_of_mass.x - this->player_rackets[0].platform->size.x / 2,
+                                         this->player_rackets[0].platform->center_of_mass.y,
+                                         this->player_rackets[0].platform->center_of_mass.z);
+
+        Masspoint * masspoint_1 = this->query_masspoint(this->player_rackets[0].spring->a);
+        masspoint_1->warp(masspoint_1_position);
+
+        Masspoint * masspoint_2 = this->query_masspoint(this->player_rackets[0].spring->b);
+        masspoint_2->warp(masspoint_2_position);
     }
 
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[1].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[1].spring->b);
-        m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
-        m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
+        this->player_rackets[1].platform->warp(Vec3(this->goals[1]->center_of_mass.x - this->goals[1]->size.x / 2 - HORIZONTAL_OFFSET_PLAYER_RACKETS, 
+                                                    this->goals[1]->center_of_mass.y, 
+                                                    this->goals[1]->center_of_mass.z), 
+                                               Quat(0, 0, 0, 1));
+
+        Vec3 masspoint_1_position = Vec3(this->goals[1]->center_of_mass.x - this->goals[1]->size.x / 2, this->goals[1]->center_of_mass.y, this->goals[1]->center_of_mass.z);
+
+        Vec3 masspoint_2_position = Vec3(this->player_rackets[1].platform->center_of_mass.x + this->player_rackets[1].platform->size.x / 2,
+                                         this->player_rackets[1].platform->center_of_mass.y,
+                                         this->player_rackets[1].platform->center_of_mass.z);
+        
+        Masspoint * masspoint_1 = this->query_masspoint(this->player_rackets[1].spring->a);
+        masspoint_1->warp(masspoint_1_position);
+
+        Masspoint * masspoint_2 = this->query_masspoint(this->player_rackets[1].spring->b);
+        masspoint_2->warp(masspoint_2_position);
     }
 
-    //Reset heat grid
-    for (int i = 0; i < this->heat_grid.width; ++i) {
-        for (int j = 0; j < this->heat_grid.height; ++j) {
-            this->heat_grid.set(i, j, 0);
-        }
-    }
+    //
+    // Reset heat grid
+    //
+    this->heat_grid.reset();
 }
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
@@ -928,16 +971,11 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     // max temperatur -> min_velocity
     
     // solve m * temp_cell + t = amplifier
-    const float amplifier = heat_grid.m * temp_cell + heat_grid.t;
+    const float amplifier = heat_grid.m * temp_cell + heat_grid.t - 1;
 
-    ball->apply_force(ball->center_of_mass, ball->linear_velocity * (1-amplifier));
+    ball->apply_force(ball->center_of_mass, ball->linear_velocity * amplifier);
 
     // Increase temperate of cell where the ball currently is
-    // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
-
-    // Each frame, we want to take out as much energy as we add, so that the total "energy count" remains
-    // the frame.
-    //const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
     const float decrease = this->heat_grid.heat_rise_by_ball / 48;
 
     for(int i = 0; i < this->heat_grid.width; ++i) {
@@ -956,11 +994,6 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 
     this->move_player_racket(&this->player_rackets[0], 'W', 'S', 'A', 0);
     this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN, VK_RIGHT, 1);
-
-    //
-    // @Incomplete: Speed up or slow down the ball depending on the current
-    // cell temperature -> DENNIS
-    //
 }
 
 void OpenProjectSimulator::update_physics_engine(float dt) {    
@@ -1419,16 +1452,16 @@ void OpenProjectSimulator::draw_game() {
     for (int i{ 0 }; i < score1; i++) {
         if (i < 5) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-            this->DUC->drawSphere(Vec3(-1.f + 0.7f * i, goals[1]->size.y + 3.f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(-1.f + 0.7f * i, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
         }
         else if (i < 10) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-            this->DUC->drawSphere(Vec3(-1.f + 0.7f * j, goals[1]->size.y + 2.25f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(-1.f + 0.7f * j, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
             j++;
         }
         else {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-			this->DUC->drawSphere(Vec3(-1.f + 0.75f * j, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
+			this->DUC->drawSphere(Vec3(-1.f + 0.75f * j, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
 
@@ -1436,16 +1469,16 @@ void OpenProjectSimulator::draw_game() {
     for (int i{ 0 }; i < score2; i++) {
         if (i < 5) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * i - 2.f, goals[1]->size.y + 3.f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * i - 2.f, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
         }
         else if (i < 10) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * j - 2.f, goals[1]->size.y + 2.25f, OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * j - 2.f, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
             j++;
         }
         else {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
     
