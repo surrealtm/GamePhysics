@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Simulator.h"
+#include <array>
 
 //
 // Time step
@@ -45,6 +46,7 @@
 
 #define WIN_SCORE 11
 #define GOAL_DELAY 0.1f // Time for collision detection sleep between goal and scene reset; change based on DT 
+#define WIN_DELAY 2.0f // Time for collision detection sleep between win and scene reset; change based on DT
 
 //
 // Utility Functions.
@@ -166,7 +168,13 @@ struct Heat_Grid {
 	int width = 0, height = 0;
 	int scale = 1; // scaling of each cell
 	float *values = NULL; // Array of size 'width * height'. @@Leak: Does not get freed at program step, but eh.
-	float heat_rise_by_ball = 0.005f;
+	float heat_alpha = 0.1f; // How fast temperate is diffused. Higher value means faster diffusion.
+	float max_temperature = 1.2f;
+	float heat_rise_by_ball = 0.002f;
+	float max_heat_amplifier = 2.0f;
+	float min_heat_amplifier = 1.5f;
+	const float m = (min_heat_amplifier - max_heat_amplifier) / max_temperature;
+	const float t = max_heat_amplifier;
 	
 	void create(int width, int height);
 	void destroy();
@@ -175,7 +183,7 @@ struct Heat_Grid {
 	void randomize();
 	void set(int x, int y, float value);
 	float get(int x, int y);
-	float* get_cell_to_worldpos(float world_x, float world_y);
+	std::array<int, 2> get_cell_to_worldpos(float world_x, float world_y);
 };
 
 //
@@ -249,6 +257,7 @@ public:
 	void setupBall();
 	void reset_after_goal(bool player1);
 	void reset_after_win(bool player1);
+	void reset_except_ball();
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -332,9 +341,6 @@ private:
 	// We should also probably have one big Player struct, which owns not only the racket, but also the
 	// score and the goal (and maybe the goal time stamp, for whatever that is required). That way, we'd
 	// have less cluttering here, and less indices to worry about.
-	// Lastly, I'm not entirely sure why the heat_accelleration_for_ball (is that even spelled correctly?)
-	// is stored here, seems that should also be a constant, applied once per frame to the rigid body...
-	// 
 	//   - vmat, 28.01.24
 	//
 
@@ -343,7 +349,9 @@ private:
 	Rigid_Body* ball;
 	int score1;
 	int score2;
+	bool winner;
 	double goalTimeStamp;
+	double winTimeStamp;
 
 	float heat_accelleration_for_ball;
 
@@ -354,7 +362,6 @@ private:
 	// Heat Diffusion.
 	//
 	Heat_Grid heat_grid;
-	float heat_alpha; // How fast temperate is diffused. Higher value means faster diffusion.
 
     //
     // Joints.

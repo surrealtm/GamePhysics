@@ -369,14 +369,25 @@ void Heat_Grid::reset() {
 void Heat_Grid::apply_boundary_condition() {
     const float boundary_value = 0.f;
 
-    for(int x = 0; x < this->width; ++x) {
-        this->set(x, 0, boundary_value);
-        this->set(x, this->height - 1, boundary_value);
-    }
-
-    for(int y = 1; y < this->height - 1; ++y) {
-        this->set(0, y, boundary_value);
-        this->set(this->width - 1, y, boundary_value);
+    for (int y = 0; y < this->height; ++y)
+    {
+        for (int x = 0; x < this->width; ++x)
+        {
+            if (x == 0 ||y == 0)
+            {
+                this->set(x, y, boundary_value);
+                continue;
+            }
+            
+            float value = this->get(x,y);
+            if (value < 0)
+            {
+                this->set(x, y, boundary_value);
+            }else if(value > max_temperature)
+            {
+                this->set(x,y, max_temperature);
+            }
+        }
     }
 }
 
@@ -402,12 +413,13 @@ float Heat_Grid::get(int x, int y) {
     return this->values[y * this->width + x];
 }
 
-float* Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
+std::array<int, 2> Heat_Grid::get_cell_to_worldpos(float world_x, float world_y)
 {
     int grid_x = (world_x + scale/2) / scale;
     int grid_y = (world_y + scale/2) / scale;
 
-    return values + grid_y * width + grid_x;
+    return {grid_x, grid_y};
+    //return values + grid_y * width + grid_x;
 }
 
 
@@ -796,10 +808,10 @@ void OpenProjectSimulator::setupBall()
     this->ball->set_angular_factor(Vec3(0, 0, 1));
 
     // @Cleanup: Find a good initial speed for the ball.
-    if (std::rand() % 2) //not working
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); 
+    if (std::rand() % 2)
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0)); 
     else
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 1, 0));
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
     
 }
 
@@ -829,6 +841,8 @@ void OpenProjectSimulator::setup_game() {
     this->score1 = 0;
     this->score2 = 0;
     this->goalTimeStamp = 0;
+    this->winTimeStamp = 0;
+    this->winner = 0;
 #elif ACTIVE_SCENE == RIGID_BODY_TEST_SCENE
     this->setup_rigid_body_test();
 #elif ACTIVE_SCENE == JOINT_TEST_SCENE
@@ -853,22 +867,26 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 	else
 		this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
 
+    reset_except_ball();
+}
+
+void OpenProjectSimulator::reset_except_ball() {
     // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
     player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-	player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
     // Reset the player springs
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[0].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[0].spring->b);
+        Masspoint* m1 = this->query_masspoint(this->player_rackets[0].spring->a);
+        Masspoint* m2 = this->query_masspoint(this->player_rackets[0].spring->b);
         m1->warp(this->goals[0]->center_of_mass + Vec3(this->goals[0]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[0].platform->center_of_mass - Vec3(this->player_rackets[0].platform->size.x / 2, 0, 0));
     }
 
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[1].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[1].spring->b);
+        Masspoint* m1 = this->query_masspoint(this->player_rackets[1].spring->a);
+        Masspoint* m2 = this->query_masspoint(this->player_rackets[1].spring->b);
         m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
     }
@@ -882,15 +900,28 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 }
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
-	this->reset_after_goal(player1);
-    this->score1 = 0;
-    this->score2 = 0;
+
+    this->ball->linear_velocity = Vec3(0, 0, 0);
+    this->ball->angular_velocity = Vec3(0, 0, 0);
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+
+    reset_except_ball();
+
+    winner = player1;
+    winTimeStamp = get_current_time_in_milliseconds();
 }
 
 void OpenProjectSimulator::update_game_logic(float dt) {
 #if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
+    if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
+    {
+		this->reset_after_goal(winner);
+		this->score1 = 0;
+		this->score2 = 0;
+		winTimeStamp = 0;
+	}
 
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
@@ -925,28 +956,35 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     }
 
     //get current position of ball on grid
-    float* temp_cell = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    array<int, 2> grid_pos = heat_grid.get_cell_to_worldpos(ball->center_of_mass.x, ball->center_of_mass.y);
+    float const temp_cell = heat_grid.get(grid_pos[0], grid_pos[1]);
+
     // increase speed of ball depending on temperature
-    //ball->linear_velocity *= heat_accelleration_for_ball * *temp_cell; // nocheckin
+    // 0 = min temperatur -> max_velocity
+    // max temperatur -> min_velocity
     
-    
+    // solve m * temp_cell + t = amplifier
+    const float amplifier = heat_grid.m * temp_cell + heat_grid.t;
+
+    ball->apply_force(ball->center_of_mass, ball->linear_velocity * (1-amplifier));
+
     // Increase temperate of cell where the ball currently is
     // TODO better if we store previous pos of ball and current and take the vector to increase all cells on the way
 
     // Each frame, we want to take out as much energy as we add, so that the total "energy count" remains
     // the frame.
-    const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
-    
+    //const float decrease = this->heat_grid.heat_rise_by_ball / (this->heat_grid.width * this->heat_grid.height);
+    const float decrease = this->heat_grid.heat_rise_by_ball / 48;
+
     for(int i = 0; i < this->heat_grid.width; ++i) {
         for(int j = 0; j < this->heat_grid.height; ++j) {
-            float value = this->heat_grid.get(i, j);
-            if(value > 0.0f) value -= decrease;
+            float value = this->heat_grid.get(i, j) - decrease;
             this->heat_grid.set(i, j, value);
         }
     }
 
     this->heat_grid.apply_boundary_condition();
-    *temp_cell += heat_grid.heat_rise_by_ball;
+    heat_grid.set(grid_pos[0], grid_pos[1],temp_cell +  heat_grid.heat_rise_by_ball);
     
     //
     // Move the player rackets depending on player input -> MANU
@@ -1027,8 +1065,8 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
 
         float i_dt = 1.f / dt;
         float theta = 0.5f;
-        float Fx = this->heat_alpha * dt / (dx * dx);
-        float Fy = this->heat_alpha * dt / (dy * dy);
+        float Fx = heat_grid.heat_alpha * dt / (dx * dx);
+        float Fy = heat_grid.heat_alpha * dt / (dy * dy);
 
 
 #define index(x, y) ((y) * this->heat_grid.width + (x))
@@ -1059,7 +1097,7 @@ void OpenProjectSimulator::update_physics_engine(float dt) {
                 A.set_element(i, index(x, y + 1), -theta * Fy);
 
                 b[i] = this->heat_grid.get(x, y) +
-                    (1 - this->heat_alpha) * (
+                    (1 - heat_grid.heat_alpha) * (
                         Fx * (this->heat_grid.get(x + 1, y) - 2 * this->heat_grid.get(x, y) + this->heat_grid.get(x - 1, y)) +
                         Fy * (this->heat_grid.get(x, y + 1) - 2 * this->heat_grid.get(x, y) + this->heat_grid.get(x, y - 1))
                     );
