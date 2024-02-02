@@ -850,22 +850,26 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 	else
 		this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
 
+    reset_except_ball();
+}
+
+void OpenProjectSimulator::reset_except_ball() {
     // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
     player_rackets[0].platform->warp(Vec3(goals[0]->center_of_mass.x + goals[1]->size.x / 2 + OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-	player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+    player_rackets[1].platform->warp(Vec3(goals[1]->center_of_mass.x - goals[1]->size.x / 2 - OFFSET_PLAYERACKETS, heightPos, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
 
     // Reset the player springs
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[0].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[0].spring->b);
+        Masspoint* m1 = this->query_masspoint(this->player_rackets[0].spring->a);
+        Masspoint* m2 = this->query_masspoint(this->player_rackets[0].spring->b);
         m1->warp(this->goals[0]->center_of_mass + Vec3(this->goals[0]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[0].platform->center_of_mass - Vec3(this->player_rackets[0].platform->size.x / 2, 0, 0));
     }
 
     {
-        Masspoint * m1 = this->query_masspoint(this->player_rackets[1].spring->a);
-        Masspoint * m2 = this->query_masspoint(this->player_rackets[1].spring->b);
+        Masspoint* m1 = this->query_masspoint(this->player_rackets[1].spring->a);
+        Masspoint* m2 = this->query_masspoint(this->player_rackets[1].spring->b);
         m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
     }
@@ -880,9 +884,11 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
 
-    this->ball->warp(Vec3(100,0,0), Quat(0, 0, 0, 1));
     this->ball->linear_velocity = Vec3(0, 0, 0);
     this->ball->angular_velocity = Vec3(0, 0, 0);
+    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
+
+    reset_except_ball();
 
     winner = player1;
     winTimeStamp = get_current_time_in_milliseconds();

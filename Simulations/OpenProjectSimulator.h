@@ -257,6 +257,7 @@ public:
 	void setupBall();
 	void reset_after_goal(bool player1);
 	void reset_after_win(bool player1);
+	void reset_except_ball();
 	
 	void set_default_camera_position();
 	void setup_game();
