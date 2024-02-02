@@ -938,12 +938,8 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 }
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
-
-    this->ball->linear_velocity = Vec3(0, 0, 0);
-    this->ball->angular_velocity = Vec3(0, 0, 0);
-    this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-
-    reset_except_ball();
+    this->reset_after_goal(player1);
+    this->ball->warp(this->ball->center_of_mass, this->ball->orientation); // Clear out any impulse on the ball, introduced in reset_after_goal.
 
     winner = player1;
     if(player1)
