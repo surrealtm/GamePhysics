@@ -780,10 +780,10 @@ void OpenProjectSimulator::setupBall()
     this->ball->set_angular_factor(Vec3(0, 0, 1));
 
     // @Cleanup: Find a good initial speed for the ball.
-    if (std::rand() % 2) //not working
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); 
+    if (std::rand() % 2)
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0)); 
     else
-        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 1, 0));
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
     
 }
 
@@ -813,6 +813,8 @@ void OpenProjectSimulator::setup_game() {
     this->score1 = 0;
     this->score2 = 0;
     this->goalTimeStamp = 0;
+    this->winTimeStamp = 0;
+    this->winner = 0;
 #elif ACTIVE_SCENE == RIGID_BODY_TEST_SCENE
     this->setup_rigid_body_test();
 #elif ACTIVE_SCENE == JOINT_TEST_SCENE
@@ -866,15 +868,26 @@ void OpenProjectSimulator::reset_after_goal(bool player1) {
 }
 
 void OpenProjectSimulator::reset_after_win(bool player1) {
-	this->reset_after_goal(player1);
-    this->score1 = 0;
-    this->score2 = 0;
+
+    this->ball->warp(Vec3(100,0,0), Quat(0, 0, 0, 1));
+    this->ball->linear_velocity = Vec3(0, 0, 0);
+    this->ball->angular_velocity = Vec3(0, 0, 0);
+
+    winner = player1;
+    winTimeStamp = get_current_time_in_milliseconds();
 }
 
 void OpenProjectSimulator::update_game_logic(float dt) {
 #if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
+    if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
+    {
+		this->reset_after_goal(winner);
+		this->score1 = 0;
+		this->score2 = 0;
+		winTimeStamp = 0;
+	}
 
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
