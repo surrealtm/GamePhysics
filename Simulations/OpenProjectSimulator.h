@@ -254,8 +254,8 @@ public:
 	void setupWalls();
 	void setupPlayerPlatforms();
 	void setupBall();
-	void reset_after_goal();
-	void reset_after_win();
+	void reset_after_goal(bool player1);
+	void reset_after_win(bool player1);
 	
 	void set_default_camera_position();
 	void setup_game();
@@ -282,7 +282,7 @@ private:
 	void calculate_masspoint_positions(float dt);
 	void calculate_masspoint_velocities(float dt);
 
-	void move_player_racket(Player_Racket * racket, int key_up, int key_down);
+	void move_player_racket(Player_Racket * racket, int key_up, int key_down, int key_side, int player);
     bool trigger_collision_occurred(Rigid_Body * trigger, Rigid_Body * other);
     
     //

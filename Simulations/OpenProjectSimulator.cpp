@@ -789,18 +789,24 @@ void OpenProjectSimulator::setupBall()
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x , goals[0]->center_of_mass.y , OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
     this->ball->set_linear_factor(Vec3(1, 1, 0));
     this->ball->set_angular_factor(Vec3(0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); // @Cleanup: Find a good initial speed for the ball.
+
+    // @Cleanup: Find a good initial speed for the ball.
+    if (std::rand() % 2) //not working
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 1, 0)); 
+    else
+        this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 1, 0));
     
 }
 
 void OpenProjectSimulator::set_default_camera_position() {
     if(this->DUC) {
 #if ACTIVE_SCENE == GAME_SCENE
-        const float lookat_size = 16.0f;
+        const float lookat_size = 1.0f;
 
         
         this->DUC->g_camera.Reset();
-        this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -40.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+        this->DUC->g_camera.SetViewParams(XMVECTORF32 { lookat_size / 2, lookat_size / 2, -30.0f }, { lookat_size / 2, lookat_size / 2, 0.f });
+        this->DUC->g_camera.SetModelCenter(XMFLOAT3{float(heat_grid.width / 2),float(heat_grid.height / 2) + 1,5});
 #else
         this->DUC->g_camera.Reset();
         this->DUC->g_camera.SetViewParams(XMVECTORF32 { -0.5f, 1.f, 0.f }, { 0.f, 1.f, 0.f });
@@ -831,13 +837,16 @@ void OpenProjectSimulator::setup_game() {
     this->time_of_previous_update = get_current_time_in_milliseconds();
 }
 
-void OpenProjectSimulator::reset_after_goal() {
+void OpenProjectSimulator::reset_after_goal(bool player1) {
     // Reset ball
     this->ball->linear_velocity = Vec3(0, 0, 0);
     this->ball->angular_velocity = Vec3(0, 0, 0);
     this->ball->angular_momentum = Vec3(0, 0, 0);
     this->ball->warp(Vec3(normal_walls[0]->center_of_mass.x, goals[0]->center_of_mass.y, OFFSET_HEAT_GRID), Quat(0, 0, 0, 1));
-    this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
+    if (player1)
+		this->ball->apply_impulse(ball->center_of_mass, Vec3(10, 0, 0));
+	else
+		this->ball->apply_impulse(ball->center_of_mass, Vec3(-10, 0, 0));
 
     // Reset the player rackets
     float heightPos = goals[0]->center_of_mass.y;
@@ -858,10 +867,17 @@ void OpenProjectSimulator::reset_after_goal() {
         m1->warp(this->goals[1]->center_of_mass - Vec3(this->goals[1]->size.x / 2, 0, 0));
         m2->warp(this->player_rackets[1].platform->center_of_mass + Vec3(this->player_rackets[1].platform->size.x / 2, 0, 0));
     }
+
+    //Reset heat grid
+    for (int i = 0; i < this->heat_grid.width; ++i) {
+        for (int j = 0; j < this->heat_grid.height; ++j) {
+            this->heat_grid.set(i, j, 0);
+        }
+    }
 }
 
-void OpenProjectSimulator::reset_after_win() {
-	this->reset_after_goal();
+void OpenProjectSimulator::reset_after_win(bool player1) {
+	this->reset_after_goal(player1);
     this->score1 = 0;
     this->score2 = 0;
 }
@@ -883,9 +899,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
             score1++;
             if (score1 >= WIN_SCORE) {
                 printf("Player one has won!\n");
-                reset_after_win();
+                reset_after_win(true);
             } else
-                reset_after_goal();
+                reset_after_goal(true);
         }
     }
 
@@ -897,9 +913,9 @@ void OpenProjectSimulator::update_game_logic(float dt) {
             score2++;
             if (score2 >= WIN_SCORE) {
 				printf("Player two has won!\n");
-                reset_after_win();
+                reset_after_win(false);
             } else
-                reset_after_goal();
+                reset_after_goal(false);
         }
     }
 
@@ -938,8 +954,13 @@ void OpenProjectSimulator::update_game_logic(float dt) {
     // Move the player rackets depending on player input -> MANU
     //
 
-    this->move_player_racket(&this->player_rackets[0], 'W', 'S');
-    this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN);
+    this->move_player_racket(&this->player_rackets[0], 'W', 'S', 'A', 0);
+    this->move_player_racket(&this->player_rackets[1], VK_UP, VK_DOWN, VK_RIGHT, 1);
+
+    //
+    // @Incomplete: Speed up or slow down the ball depending on the current
+    // cell temperature -> DENNIS
+    //
 }
 
 void OpenProjectSimulator::update_physics_engine(float dt) {    
@@ -1582,7 +1603,7 @@ void OpenProjectSimulator::calculate_masspoint_velocities(float dt) {
     }
 }
 
-void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down) {
+void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up, int key_down, int key_side, int player) {
     //
     // Apply a friction force to the racket to stop it from moving.
     //
@@ -1592,6 +1613,7 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
     // Apply a movement force when the player has pressed the respective keys to do so.
     //
     const float speed = 50.f; // This is in meters / second
+    const float horizontal_speed = 15.f;
 
     if(DXUTIsKeyDown(key_up)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, speed, 0));
@@ -1599,6 +1621,13 @@ void OpenProjectSimulator::move_player_racket(Player_Racket * racket, int key_up
 
     if(DXUTIsKeyDown(key_down)) {
         racket->platform->apply_force(racket->platform->center_of_mass, Vec3(0, -speed, 0));
+    }
+
+    if (DXUTIsKeyDown(key_side) && player == 0) {
+		racket->platform->apply_force(racket->platform->center_of_mass, Vec3(-horizontal_speed, 0, 0));
+    }
+    else if (DXUTIsKeyDown(key_side) && player == 1) {
+        racket->platform->apply_force(racket->platform->center_of_mass, Vec3(horizontal_speed, 0, 0));
     }
 
     //
