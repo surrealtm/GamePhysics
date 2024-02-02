@@ -488,14 +488,13 @@ OpenProjectSimulator::OpenProjectSimulator() {
     this->stepping      = false;
     this->time_factor   = 1.0;
     this->draw_requests = DRAW_EVERYTHING;
-    this->heat_alpha    = 0.8f; // Half decay.
     this->textforBar    = "";
     this->textP1        = "";
     this->textP1Control1= "W,S";
     this->textP1Control2= "A";
     this->textP2        = "";
-    this->textP2Control1= "↑, ↓";
-    this->textP2Control2= "→";
+    this->textP2Control1= "^, v";
+    this->textP2Control2= ">";
     setup_timing();
 }
 
@@ -518,12 +517,12 @@ void OpenProjectSimulator::initUI(DrawingUtilitiesClass * DUC) {
     TwAddVarRW(this->tweak_bar, " ", TW_TYPE_STDSTRING, &this->textforBar, "");
     TwAddVarRW(this->tweak_bar, "=========", TW_TYPE_STDSTRING, &this->textforBar, "");
     TwAddVarRW(this->tweak_bar, "Player 1", TW_TYPE_STDSTRING, &this->textP1, "");
-    TwAddVarRW(this->tweak_bar, "Movement", TW_TYPE_STDSTRING, &this->textP1Control1, "");
-    TwAddVarRW(this->tweak_bar, "Shooting", TW_TYPE_STDSTRING, &this->textP1Control2, "");
+    TwAddVarRW(this->tweak_bar, "Move", TW_TYPE_STDSTRING, &this->textP1Control1, "");
+    TwAddVarRW(this->tweak_bar, "Charge", TW_TYPE_STDSTRING, &this->textP1Control2, "");
     TwAddVarRW(this->tweak_bar, "---------", TW_TYPE_STDSTRING, &this->textforBar, "");
     TwAddVarRW(this->tweak_bar, "Player 2", TW_TYPE_STDSTRING, &this->textP2, "");
-    TwAddVarRW(this->tweak_bar, "Movement ", TW_TYPE_STDSTRING, &this->textP2Control1, "");
-    TwAddVarRW(this->tweak_bar, "Shooting ", TW_TYPE_STDSTRING, &this->textP2Control2, "");
+    TwAddVarRW(this->tweak_bar, "Move ", TW_TYPE_STDSTRING, &this->textP2Control1, "");
+    TwAddVarRW(this->tweak_bar, "Charge ", TW_TYPE_STDSTRING, &this->textP2Control2, "");
     TwAddVarRW(this->tweak_bar, "========", TW_TYPE_STDSTRING, &this->textforBar, "");
     this->set_default_camera_position();
 }
@@ -908,6 +907,13 @@ void OpenProjectSimulator::reset_after_win(bool player1) {
     reset_except_ball();
 
     winner = player1;
+    if(player1)
+    {
+        this->textP1        = "Winner";
+    }else
+    {
+        this->textP2        = "Winner";
+    }
     winTimeStamp = get_current_time_in_milliseconds();
 }
 
@@ -921,6 +927,8 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 		this->score1 = 0;
 		this->score2 = 0;
 		winTimeStamp = 0;
+        this->textP1        = "";
+        this->textP2        = "";
 	}
 
     //
