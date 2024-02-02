@@ -531,7 +531,8 @@ void OpenProjectSimulator::reset() {
     this->masspoint_count  = 0;
     this->spring_count     = 0;
     this->rigid_body_count = 0;
-    this->joint_count      = 0;    
+    this->joint_count      = 0;
+    TwDeleteBar(this->winbar);
     this->setup_game();    
 }
 
@@ -909,10 +910,19 @@ void OpenProjectSimulator::reset_after_win(bool player1) {
     winner = player1;
     if(player1)
     {
-        this->textP1        = "Winner";
+        this->winbar = TwNewBar("Winner");
+        TwAddVarRW(this->winbar, "Player1", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddVarRW(this->winbar, "Won", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddButton(this->winbar, "Restart", [](void * data){ tw_reset_button_callback(data); }, this, "");
+
+        
     }else
     {
-        this->textP2        = "Winner";
+        this->winbar = TwNewBar("Winner");
+        TwAddVarRW(this->winbar, "Player2", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddVarRW(this->winbar, "Won", TW_TYPE_STDSTRING, &this->textforBar, "");
+        TwAddButton(this->winbar, "Restart", [](void * data){ tw_reset_button_callback(data); }, this, "");
+
     }
     winTimeStamp = get_current_time_in_milliseconds();
 }
@@ -921,15 +931,14 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 #if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
-    if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
+    /*if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
     {
 		this->reset_after_goal(winner);
 		this->score1 = 0;
 		this->score2 = 0;
 		winTimeStamp = 0;
-        this->textP1        = "";
-        this->textP2        = "";
-	}
+        TwDeleteBar(this->winbar);
+	}*/
 
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score

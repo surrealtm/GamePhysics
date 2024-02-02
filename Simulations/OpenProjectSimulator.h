@@ -313,6 +313,7 @@ private:
 	// General stuff.
 	//
 	TwBar *tweak_bar;
+	TwBar *winbar;
 	DrawRequest draw_requests;
 	std::vector<Vec3> debug_draw_points; // Debug: Can be used to draw anything in immediate mode.
 	float gravity;
