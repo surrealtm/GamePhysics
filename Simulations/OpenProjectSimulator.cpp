@@ -3,14 +3,6 @@
 #include "sat.h"
 
 //
-// @Incomplete:
-//   * Try to make the ball much lighter, so that the rackets don't bounce that much
-//   * Add restitution to the north and south walls so that the ball doesn't get stuck
-//   * Make the ball not slow down instantly
-//   * Increase the spring damping so that the rackets don't spring as much
-//
-
-//
 // Utility Functions
 //
 
@@ -735,7 +727,7 @@ void OpenProjectSimulator::setup_joint_test() {
 }
 
 void OpenProjectSimulator::setupHeatGrid() {
-    this->heat_grid.create(15, 11);    
+    this->heat_grid.create(21, 17);    
 }
 
 void OpenProjectSimulator::setupWalls()
@@ -822,14 +814,14 @@ void OpenProjectSimulator::setupPlayerPlatforms()
 
     for (auto racket : this->player_rackets) {
 		racket.platform->set_linear_factor(Vec3(1, 1, 0));
-        racket.platform->set_angular_factor(Vec3(0, 0, 0));
+        racket.platform->set_angular_factor(Vec3(0, 0, .5));
 	}
 }
 
 void OpenProjectSimulator::setupBall()
 {
     const Real ballScale   = 1.0;
-    const Real ballMass    = 1.0; // @Cleanup: Maybe decrease to make the ball faster?
+    const Real ballMass    = 1.0;
     const Real restitution = 2; // @@Volatile: This should match the racket's platform's restitution
 
     this->ball = this->create_and_query_rigid_body(Vec3(ballScale), ballMass, restitution, false);
@@ -965,15 +957,6 @@ void OpenProjectSimulator::update_game_logic(float dt) {
 #if ACTIVE_SCENE != GAME_SCENE
     return; // All the pointers and stuff aren't set up for the test scene.
 #endif
-    /*if (winTimeStamp != 0 && winTimeStamp + WIN_DELAY < get_current_time_in_milliseconds())
-    {
-		this->reset_after_goal(winner);
-		this->score1 = 0;
-		this->score2 = 0;
-		winTimeStamp = 0;
-        TwDeleteBar(this->winbar);
-	}*/
-
     //
     // Check if the ball has collided with any of the goals. If that happens, reset the scene and add a score
     // for the other player.
@@ -1496,16 +1479,16 @@ void OpenProjectSimulator::draw_game() {
     for (int i{ 0 }; i < score1; i++) {
         if (i < 5) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-            this->DUC->drawSphere(Vec3(-1.f + 0.7f * i, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(0.7f * i, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
         }
         else if (i < 10) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-            this->DUC->drawSphere(Vec3(-1.f + 0.7f * j, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(0.7f * j, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
             j++;
         }
         else {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0.8f, 0, 0), 1, Vec3(0.8f, 0, 0));
-			this->DUC->drawSphere(Vec3(-1.f + 0.75f * j, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
+			this->DUC->drawSphere(Vec3(0.75f * j, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
 
@@ -1513,16 +1496,16 @@ void OpenProjectSimulator::draw_game() {
     for (int i{ 0 }; i < score2; i++) {
         if (i < 5) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * i - 2.f, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x + 1 - 0.7f * i - 2.f, goals[1]->size.y + 3.f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
         }
         else if (i < 10) {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.7f * j - 2.f, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x + 1 - 0.7f * j - 2.f, goals[1]->size.y + 2.25f, Z_OFFSET_HEAT_GRID), Vec3(0.25f, 0.25f, 0.25f));
             j++;
         }
         else {
             this->DUC->setUpLighting(Vec3(0, 0, 0), Vec3(0, 0, 0.8f), 1, Vec3(0, 0, 0.8f));
-            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
+            this->DUC->drawSphere(Vec3(normal_walls[1]->size.x + 1 - 0.75f * j - 2.f, goals[1]->size.y + 2.625f, Z_OFFSET_HEAT_GRID), Vec3(0.5f, 0.5f, 0.5f));
         }
     }
     
